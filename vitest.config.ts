@@ -299,6 +299,10 @@ export default defineConfig({
         // only in lib; the post-build built-bin smoke executes both entries.
         'packages/api/remotes/src/index.ts',
         'packages/api/remotes/src/client/index.ts',
+        // The SuiXing bridge barrel is re-exports only, so V8 attributes no
+        // executable range to it — same reason the remotes index above is here.
+        // Every module it re-exports is covered through the contract suite.
+        'packages/api/suixing-platform/src/index.ts',
         // The Team browser entry binds its source-covered mount lifecycle to
         // the generated Team Remote contribution, which likewise exists only in lib.
         'packages/experimental/client-ui-agent-team/src/client/index.ts',

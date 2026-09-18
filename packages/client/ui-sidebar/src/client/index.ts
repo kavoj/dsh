@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: pulls the conversation header slot declarations.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from './contract/slots.ts'
+import { createSidebarCatalog, type ISidebarCatalog } from './catalog.ts'
 import { HeaderLeadingControls } from './HeaderLeadingControls.tsx'
 import { SidebarRoot } from './SidebarRoot.tsx'
 import { en, zh, type SidebarKey } from './locales.ts'
@@ -21,7 +22,22 @@ export type {
   SidebarPanelIconOwnerProps, SidebarPanelMetadata,
   SidebarRootComponentProps, SidebarRootInjected, SidebarSectionOwnerProps, SidebarSettingsOwnerProps,
 } from './contract/slots.ts'
+export type {
+  CatalogEntry, CatalogEntryTarget, CatalogGroup, CatalogGroupView, CatalogSnapshot, CatalogStatus,
+  ISidebarCatalog,
+} from './catalog.ts'
+export type { CatalogRegionProps } from './CatalogGroups.tsx'
+// The factory is public so a registrant's own tests can publish into the same
+// service the shell reads, instead of standing up a second implementation.
+export { CATALOG_VISIBLE_LIMIT, createSidebarCatalog } from './catalog.ts'
 export type { SidebarKey } from './locales.ts'
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Registrant-facing catalog registry: publish groups for the sidebar to render. */
+    sidebarCatalog: ISidebarCatalog
+  }
+}
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -63,13 +79,26 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.slots.subscribe('sidebar.panellist', syncPanels), 'ui-sidebar: panel entries')
   ctx.effect(() => ctx.locale.subscribe(syncPanels), 'ui-sidebar: panel labels')
 
+  // The catalog registry is the shell's own: entry data never enters this
+  // package's source, so a distribution composes its catalog from outside.
+  const catalog = createSidebarCatalog((panelId) => { ctx.layout.selectPanel(panelId) })
+  ctx.effect(() => {
+    const disposeService = ctx.reflect.provide('sidebarCatalog', catalog)
+    return () => {
+      catalog.dispose()
+      // provide()'s disposer settles asynchronously; teardown is fire-and-forget.
+      void disposeService()
+    }
+  }, 'ui-sidebar: catalog service')
+
   const injectProps = (): SidebarRootInjected => ({
     // The shell's New Session button rides the Workspace UI's shared action
     // (current Session Workspace, then recent Workspace).
     startSession: (workspaceId) => { workspaceNavigation.startSession(workspaceId) },
     toggleSidebar: () => { ctx.layout.toggleSidebar() },
     selectPanel: (id) => { ctx.layout.selectPanel(id) },
-    hooks: { panels },
+    catalog,
+    hooks: { catalog, panels },
   })
   ctx.slots.inject('sidebar', () => ctx.slots.register({
     name: 'sidebar',

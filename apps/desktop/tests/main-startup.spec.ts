@@ -40,6 +40,7 @@ const harness = await vi.hoisted(async () => {
   let quitCompleted = deferred()
   let policyBlocked = deferred()
   let embeddedPolicy: unknown
+  let appManifest: Record<string, unknown> = {}
   let closeWindowsOnQuit = false
   let updateState: DesktopUpdateState = { phase: 'idle' }
   const updateCheck = vi.fn(async (_manual?: boolean): Promise<DesktopUpdateState> => updateState)
@@ -156,6 +157,8 @@ const harness = await vi.hoisted(async () => {
     get policyBlocked() { return policyBlocked },
     get embeddedPolicy() { return embeddedPolicy },
     set embeddedPolicy(value: unknown) { embeddedPolicy = value },
+    get appManifest() { return appManifest },
+    set appManifest(value: Record<string, unknown>) { appManifest = value },
     nextNavigation() { navigated = deferred(); return navigated.promise },
     nextHostStart() { hostStarted = deferred(); return hostStarted.promise },
     get pluginsEnabled() { return pluginsEnabled },
@@ -178,6 +181,7 @@ const harness = await vi.hoisted(async () => {
       navigated = deferred(); dialogShown = deferred(); quitCompleted = deferred()
       policyBlocked = deferred()
       embeddedPolicy = undefined
+      appManifest = {}
     },
   }
 })
@@ -214,7 +218,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:fs/promises')>()
   return { ...original, readFile: vi.fn((path: Parameters<typeof original.readFile>[0], encoding?: 'utf8') => {
     if (path === join('desktop-test-app', 'package.json')) {
-      return Promise.resolve(JSON.stringify({ dshDesktopAppId: 'com.deepseek.dsh', dshMandatoryUpdatePolicy: harness.embeddedPolicy }))
+      return Promise.resolve(JSON.stringify({ dshDesktopAppId: 'com.deepseek.dsh', dshMandatoryUpdatePolicy: harness.embeddedPolicy, ...harness.appManifest }))
     }
     return encoding === undefined ? original.readFile(path) : original.readFile(path, encoding)
   }) }
@@ -323,6 +327,22 @@ describe('desktop main startup', () => {
     expect({ menu: submenu.slice(0, 2), options: { ...options, iconPath: '<app icon>' } }).toEqual(expected[locale])
     expect(options.iconPath).toBe(packaged ? join('desktop-test-resources', 'icon.png')
       : join('desktop-test-app', 'resources', 'icon-windows.png'))
+  })
+
+  it('names the packaged product and shows its upstream attribution when the manifest carries them', async () => {
+    harness.appManifest = { dshDesktopProductName: 'SuiXing', dshDesktopAttribution: 'Built on DeepSeek Harness. Notices: THIRD_PARTY_NOTICES.md.' }
+    await readyForUpdate()
+    const options = harness.app.setAboutPanelOptions.mock.calls[0]![0]
+    expect(options.applicationName).toBe('SuiXing')
+    expect(options.copyright).toBe('Built on DeepSeek Harness. Notices: THIRD_PARTY_NOTICES.md.')
+  })
+
+  it.each([undefined, '', '   ', 42])('keeps the upstream About panel when the recorded product name is %o', async (recorded) => {
+    harness.appManifest = { dshDesktopProductName: recorded, dshDesktopAttribution: recorded }
+    await readyForUpdate()
+    const options = harness.app.setAboutPanelOptions.mock.calls[0]![0]
+    expect(options.applicationName).toBe('DeepSeek Harness')
+    expect(options.copyright).toBe('')
   })
 
   it('shows one explained startup login before Host readiness and joins concurrent checks without reopening it', async () => {

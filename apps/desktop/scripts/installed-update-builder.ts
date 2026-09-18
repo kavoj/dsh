@@ -1,6 +1,7 @@
 /** Select isolated qualification inputs without weakening the ordinary Windows installer or signing hooks. */
 import { join } from 'node:path'
 import { createElectronBuilderConfig } from './electron-builder-config.mjs'
+import { DEFAULT_DESKTOP_ARTIFACT_SLUG, DEFAULT_DESKTOP_PRODUCT_NAME } from './desktop-product-identity.mjs'
 import { readInstalledUpdateRun } from './installed-update-qualification.ts'
 import { verifyInstalledUpdateApplication } from './prepare-installed-update-application.ts'
 import { verifyDesktopRuntime } from '../src/runtime-tree.ts'
@@ -22,7 +23,12 @@ export async function createInstalledUpdateBuilderConfig(manifest: string, versi
   const application = await verifyInstalledUpdateApplication(run.root)
   const dsh = join(run.root, version, 'dsh')
   await verifyDesktopRuntime(dsh, version, { platform: 'win32', arch: 'x64' })
+  // Qualification pins the default identity: its distribution step validates
+  // the packaged filenames this slug produces, independent of any brand the
+  // surrounding release settings select.
   const config = createElectronBuilderConfig({ ...environment, DSH_DESKTOP_APP_ID: run.appId,
+    DSH_DESKTOP_PRODUCT_NAME: DEFAULT_DESKTOP_PRODUCT_NAME,
+    DSH_DESKTOP_ARTIFACT_SLUG: DEFAULT_DESKTOP_ARTIFACT_SLUG,
     DSH_DESKTOP_TARGET_PLATFORM: 'win32', DSH_DESKTOP_TARGET_ARCH: 'x64', DSH_DESKTOP_UNSIGNED: '0' }, 'win32', 'x64', dsh)
   return { ...config,
     productName: run.productName,

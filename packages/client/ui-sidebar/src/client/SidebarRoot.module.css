@@ -496,6 +496,17 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Catalog seat: a bounded, self-scrolling stack between the global panel rows
+   and the workspace browser. It is absent from the DOM entirely until a
+   distribution publishes a group, so the default sidebar keeps its layout. */
+.catalogArea {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 55%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 /* Region seat: always mounted so the foot never moves. Its trailing margin
    cancels the wide shell inset so the nested scrollbar can sit at the sidebar
    edge; the browser restores that inset inside its own rows. */

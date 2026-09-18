@@ -575,15 +575,6 @@ async function main(): Promise<void> {
     updates.dispose()
   })
 
-  app.setAboutPanelOptions({
-    applicationName: 'DeepSeek Harness',
-    applicationVersion: app.getVersion(),
-    // The release has no separate build number; omit Electron's bundle version.
-    version: '',
-    copyright: '',
-    iconPath: development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
-      : join(process.resourcesPath, 'icon.png'),
-  })
   // A custom application menu replaces Electron's default menu, so macOS needs
   // its standard menus and application hide commands declared explicitly.
   const darwin = process.platform === 'darwin'
@@ -718,6 +709,20 @@ async function main(): Promise<void> {
   mainWindow = createMainWindow()
   const manifest: unknown = JSON.parse(await readFile(join(app.getAppPath(), 'package.json'), 'utf8'))
   if (typeof manifest !== 'object' || manifest === null) throw new Error('desktop policy: invalid application manifest')
+  /** Read one optional non-empty string the packaging environment recorded. */
+  const manifestText = (value: unknown): string => typeof value === 'string' ? value.trim() : ''
+  app.setAboutPanelOptions({
+    // A derived distribution names itself and carries its upstream attribution;
+    // the upstream release keeps the name and empty attribution line it publishes.
+    applicationName: ('dshDesktopProductName' in manifest ? manifestText(manifest.dshDesktopProductName) : '')
+      || 'DeepSeek Harness',
+    applicationVersion: app.getVersion(),
+    // The release has no separate build number; omit Electron's bundle version.
+    version: '',
+    copyright: 'dshDesktopAttribution' in manifest ? manifestText(manifest.dshDesktopAttribution) : '',
+    iconPath: development ? join(app.getAppPath(), 'resources', 'icon-windows.png')
+      : join(process.resourcesPath, 'icon.png'),
+  })
   const developmentPolicy = app.isPackaged ? undefined : process.env.DSH_DESKTOP_MANDATORY_UPDATE_CONFIG
   const policyInput: unknown = app.isPackaged
     ? ('dshMandatoryUpdatePolicy' in manifest ? manifest.dshMandatoryUpdatePolicy : undefined)

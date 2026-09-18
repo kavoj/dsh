@@ -35,6 +35,10 @@ The expanded brand row renders `sidebar.brand.mark` and `sidebar.brand.name` as 
 
 Plugins add an icon component to the root-scoped `sidebar.panellist` list with an `id`, optional `order`, and a string or locale-aware `label`. The same id addresses the component registered in the layout's root-scoped `main` keyed slot; selecting a missing main entry throws without changing the current selection. The label supplies plain visible text, the accessible name, and the collapsed tooltip. Each row reads its own selected state through `usePanelInfo`; moving DOM focus to search or a directory picker does not change the displayed panel or its selected row. With no registrations, neither the list nor spacing for it is rendered. The shipped composition registers no example panel.
 
+### Business catalogue
+
+A distribution can publish business menus as data through `ctx.sidebarCatalog`, the registrant-facing service this package owns. `register(group)` adds an id, an order, an already-localized title and optional secondary name, the group's entries, and the optional root-scoped `main` panel key that its "view all" row opens; `reportStatus(status, retry?)` describes a load that is running, failed, or serving a cached copy. The shell renders whatever was registered — one region above the Workspaces seat, and nothing at all, not even a wrapper, when no distribution ever published — with fold state, a five-row recency budget per group, per-group search, the view-all jump, and the four load presentations. Fold state and recency persist per browser under `dsh.sidebar.catalog`; releasing the last registration releases the claim, so the region never outlives the data behind it.
+
 ### Collapse behavior
 
 The top expand button hosts the optional, non-interactive `sidebar.toggle.badge` slot while collapsed. Its occupant supplies status and tooltip content without adding another action or changing the button's navigation behavior.
@@ -101,6 +105,7 @@ These limits define what the shell owns versus what its occupants own; they are 
 - **Session state-dot rendering is owned by ui-workspace** — no done/error notification sources are available to this shell.
 - **Workspace browser behavior is composition-owned** — grouping, ordering, search, and row state belong to ui-workspace, not this shell.
 - **"New task completed" unread marking is local viewing state** — completion-time > last-seen never reaches the host.
+- **The catalogue vocabulary is the shell's** — a registrant supplies ids, order, localized copy, entries, and a panel key; folding, the five-row budget, search, and the four load presentations are not configurable.
 
 <a id="dev-note"></a>
 ### Dev Note
@@ -112,4 +117,4 @@ None.
 
 </details>
 
-**Runtime invariant:** No companion is published. Panel metadata is a read-only presentation projection of the Slot registry and locale, with no independent write API. The registry owns entry identity and disposal; this package's assembly tests assert the projection after registration and locale notifications settle. The shell owns no separate navigation state to reconcile with those sources.
+**Runtime invariant:** No companion is published. The package provides one service (`ctx.sidebarCatalog`). Catalogue registrations and their status are released with the registrant that installed them, and the only persisted state is the catalogue's fold and recency slice; the shell holds no separate navigation state to reconcile with those sources. Panel metadata stays a read-only presentation projection of the Slot registry and locale, with no independent write API: the registry owns entry identity and disposal, and this package's assembly tests assert the projection after registration and locale notifications settle.

@@ -25,6 +25,7 @@ import type { InjectFace, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/ds
 import type {
   SidebarPanelMetadata, SidebarRootComponentProps, SidebarRootInjected, SidebarSectionOwnerProps,
 } from './contract/slots.ts'
+import { CatalogRegion } from './CatalogGroups.tsx'
 import css from './SidebarRoot.module.css'
 
 /** Wide-content unmount delay; matches the 150ms wide-content fade-out. */
@@ -91,12 +92,15 @@ export function SidebarRoot({
   startSession,
   toggleSidebar,
   selectPanel,
+  catalog,
   usePanels,
   usePanelInfo,
+  useCatalog,
   t,
   renderSlot,
 }: SidebarRootComponentProps) {
   const panels = usePanels(snapshot => snapshot)
+  const catalogSnapshot = useCatalog(snapshot => snapshot)
   // Wide content stays mounted while the collapse animates (fading via
   // .collapsed .wide), unmounts at settle, and remounts right away on expand.
   const [settled, setSettled] = useState(collapsed)
@@ -264,6 +268,22 @@ export function SidebarRoot({
             />
           ))}
         </nav>
+      )}
+
+      {/* Business catalog groups: the shell renders whatever a distribution
+          published through ctx.sidebarCatalog, and renders nothing at all —
+          no wrapper element either — when none did. */}
+      {wide && catalogSnapshot.claimed && (
+        <div className={css.catalogArea}>
+          <CatalogRegion
+            snapshot={catalogSnapshot}
+            onToggleGroup={(groupId) => { catalog.toggleGroup(groupId) }}
+            onActivate={(entry) => { catalog.activate(entry) }}
+            onSelectPanel={(panelId) => { selectPanel(panelId) }}
+            onRetry={() => { catalog.retry() }}
+            t={t}
+          />
+        </div>
       )}
 
       {/* The browsing region fills the column between the controls and the

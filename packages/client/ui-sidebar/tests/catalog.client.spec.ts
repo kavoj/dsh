@@ -1,0 +1,215 @@
+/**
+ * The catalog registry: ordering, fold state, the recency budget the sidebar
+ * renders against, status reporting with its retry, and dispatch of an
+ * activated entry. Pure data — no React and no business name anywhere.
+ */
+import { describe, expect, it, vi } from 'vitest'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import {
+  CATALOG_VISIBLE_LIMIT, createSidebarCatalog,
+  type CatalogEntry, type CatalogGroup,
+} from '../src/client/catalog.ts'
+
+const PANEL = 'test-panel' as MainPanelId
+
+/** Build one entry with a command target that records its activation. */
+function entry(id: string, hint?: string): CatalogEntry & { runs: number } {
+  const command = { runs: 0 }
+  return {
+    id,
+    label: `Entry ${id}`,
+    ...(hint === undefined ? {} : { hint }),
+    target: { kind: 'command', run: () => { command.runs += 1 } },
+    get runs() { return command.runs },
+  }
+}
+
+/** Build one group over the given entries. */
+function group(id: string, entries: readonly CatalogEntry[], extra: Partial<CatalogGroup> = {}): CatalogGroup {
+  return { id, title: `Group ${id}`, entries, ...extra }
+}
+
+describe('sidebar catalog registry', () => {
+  it('starts unclaimed: no distribution publishes, so the shell renders nothing', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    expect(catalog.getSnapshot()).toEqual({
+      claimed: false, status: 'ready', groups: [], canRetry: false,
+    })
+    catalog.dispose()
+  })
+
+  it('orders groups by their declared order, ties in arrival order', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('late', [], { order: 2 }))
+    catalog.register(group('first-tie', [], { order: 1 }))
+    catalog.register(group('second-tie', [], { order: 1 }))
+    catalog.register(group('leading', [], { order: 0 }))
+    expect(catalog.getSnapshot().groups.map(view => view.group.id))
+      .toEqual(['leading', 'first-tie', 'second-tie', 'late'])
+    catalog.dispose()
+  })
+
+  it('removes exactly the registration a disposer owns', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const keep = group('keep', [])
+    const replaceable = group('swap', [])
+    const drop = catalog.register(keep)
+    const stale = catalog.register(replaceable)
+    // Re-registering the id retires the earlier registration's disposer.
+    catalog.register(group('swap', []))
+    stale()
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['keep', 'swap'])
+    drop()
+    // The retired disposer is inert, and an unknown id is a no-op.
+    drop()
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['swap'])
+    catalog.dispose()
+  })
+
+  it('releases the claim when the last registrant lets go, and keeps it once a status is reported', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const drop = catalog.register(group('only', []))
+    expect(catalog.getSnapshot().claimed).toBe(true)
+    // Unloading the distribution that published the catalogue returns the
+    // sidebar to its unclaimed DOM rather than to an empty directory.
+    drop()
+    expect(catalog.getSnapshot()).toMatchObject({ claimed: false, groups: [] })
+    // A reported status is its own claim: the region stays for the retry seat.
+    catalog.reportStatus('offline', vi.fn())
+    expect(catalog.getSnapshot().claimed).toBe(true)
+    catalog.dispose()
+  })
+
+  it('has nothing to unfold before any group is registered', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.setGroupExpanded('ghost', false)
+    catalog.toggleGroup('ghost')
+    expect(catalog.getSnapshot().groups).toEqual([])
+    catalog.dispose()
+  })
+
+  it('unfolds the first group on a first run and materializes that choice on the first toggle', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', []))
+    catalog.register(group('b', []))
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([true, false])
+    catalog.toggleGroup('a')
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([false, false])
+    catalog.toggleGroup('b')
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([false, true])
+    catalog.setGroupExpanded('b', true)
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([false, true])
+    catalog.setGroupExpanded('a', true)
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([true, true])
+    // Setting the state a group already holds is a no-op, both ways.
+    catalog.setGroupExpanded('a', true)
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([true, true])
+    catalog.setGroupExpanded('a', false)
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([false, true])
+    catalog.setGroupExpanded('a', false)
+    expect(catalog.getSnapshot().groups.map(view => view.expanded)).toEqual([false, true])
+    catalog.dispose()
+  })
+
+  it('keeps any registration whose id is not the one the disposer owns', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const own = group('own', [])
+    const drop = catalog.register(own)
+    // A later registration replaces the id and takes over ownership.
+    const successor = group('own', [])
+    catalog.register(successor)
+    drop()
+    expect(catalog.getSnapshot().groups.map(view => view.group)).toEqual([successor])
+    catalog.dispose()
+  })
+
+  it('fills the visible rows from recency, falling back to the declared head', () => {
+    const entries = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'].map(id => entry(id))
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', entries))
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
+      .toEqual(['e1', 'e2', 'e3', 'e4', 'e5'])
+    expect(catalog.getSnapshot().groups[0]?.total).toBe(entries.length)
+    // The most recent visit leads, and the cap holds.
+    for (const candidate of entries) catalog.activate(candidate)
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
+      .toEqual(['e7', 'e6', 'e5', 'e4', 'e3'])
+    expect(catalog.getSnapshot().groups[0]?.visible).toHaveLength(CATALOG_VISIBLE_LIMIT)
+    catalog.dispose()
+  })
+
+  it('ignores recency recorded against another group and re-visits move to the front', () => {
+    const mine = entry('mine')
+    const theirs = entry('theirs')
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', [mine, entry('other')]))
+    catalog.register(group('b', [theirs]))
+    // 'theirs' is recent but not ours: our group keeps its declared head.
+    catalog.activate(theirs)
+    expect(theirs.runs).toBe(1)
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id)).toEqual(['mine', 'other'])
+    catalog.activate(entry('other'))
+    catalog.activate(mine)
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id)).toEqual(['mine', 'other'])
+    catalog.dispose()
+  })
+
+  it('caps the remembered recency at its capacity', () => {
+    const entries = Array.from({ length: 40 }, (_, index) => entry(`e${index}`))
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', entries))
+    for (const candidate of entries) catalog.activate(candidate)
+    // The newest 5 survive; the earliest visit was evicted by the cap.
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
+      .toEqual(['e39', 'e38', 'e37', 'e36', 'e35'])
+    catalog.dispose()
+  })
+
+  it('dispatches a panel target through the injected selector and a command target directly', () => {
+    const selectPanel = vi.fn()
+    const run = vi.fn()
+    const catalog = createSidebarCatalog(selectPanel)
+    catalog.register(group('a', [
+      { id: 'panel', label: 'Plain panel', target: { kind: 'panel', panelId: PANEL } },
+      { id: 'command', label: 'Command', target: { kind: 'command', run } },
+    ]))
+    catalog.activate({ id: 'panel', label: 'Plain panel', target: { kind: 'panel', panelId: PANEL } })
+    expect(selectPanel).toHaveBeenCalledExactlyOnceWith(PANEL)
+    expect(run).not.toHaveBeenCalled()
+    catalog.activate({ id: 'command', label: 'Command', target: { kind: 'command', run } })
+    expect(run).toHaveBeenCalledOnce()
+    catalog.dispose()
+  })
+
+  it('reports status with and without a retry, and retries only when one is installed', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.reportStatus('loading')
+    expect(catalog.getSnapshot()).toMatchObject({ claimed: true, status: 'loading', canRetry: false })
+    catalog.retry()
+    const retry = vi.fn()
+    catalog.reportStatus('offline', retry)
+    expect(catalog.getSnapshot().canRetry).toBe(true)
+    catalog.retry()
+    expect(retry).toHaveBeenCalledOnce()
+    catalog.reportStatus('ready')
+    expect(catalog.getSnapshot()).toMatchObject({ status: 'ready', canRetry: false })
+    catalog.dispose()
+  })
+
+  it('notifies subscribers on every change and stops after dispose', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const listener = vi.fn()
+    const stop = catalog.subscribe(listener)
+    catalog.register(group('a', []))
+    catalog.reportStatus('loading')
+    expect(listener).toHaveBeenCalledTimes(2)
+    stop()
+    catalog.reportStatus('ready')
+    expect(listener).toHaveBeenCalledTimes(2)
+    const survivor = vi.fn()
+    catalog.subscribe(survivor)
+    catalog.dispose()
+    catalog.reportStatus('error')
+    expect(survivor).not.toHaveBeenCalled()
+  })
+})

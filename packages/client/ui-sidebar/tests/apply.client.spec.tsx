@@ -78,8 +78,14 @@ describe('ui-sidebar apply', () => {
     expect(leading[0]!.locale).toBe('sidebar')
     expect(leading[0]!.inject).toBe(b.slots.entries('sidebar')[0]!.inject)
     const injected = (b.slots.entries('sidebar')[0]!.inject as () => SidebarRootInjected)()
-    expect(Object.keys(injected)).toEqual(['startSession', 'toggleSidebar', 'selectPanel', 'hooks'])
+    expect(Object.keys(injected)).toEqual(['startSession', 'toggleSidebar', 'selectPanel', 'catalog', 'hooks'])
     expect(injected.hooks.panels.getSnapshot()).toEqual([])
+    // The catalog starts unclaimed and empty: no distribution published a
+    // group, which is what keeps the region out of the shell's DOM entirely.
+    expect(injected.catalog).toBe(injected.hooks.catalog)
+    expect(injected.catalog.getSnapshot()).toEqual({
+      claimed: false, status: 'ready', groups: [], canRetry: false,
+    })
     expect(b.slots.entries('main')).toEqual([])
     // Both arms delegate to the Workspace UI's shared New Session action.
     injected.startSession('workspace' as never)

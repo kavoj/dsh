@@ -11,6 +11,7 @@ import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime } from '@d
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { ISidebarCatalog } from '../catalog.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
@@ -124,8 +125,17 @@ export type SidebarRootInjected = {
   toggleSidebar: () => void
   /** Select the global panel addressed by a sidebar row. */
   selectPanel: (id: MainPanelId) => void
+  /**
+   * The generic catalog service. Registrants publish groups into it and the
+   * shell renders them; the base layout owns no business name of its own.
+   */
+  catalog: ISidebarCatalog
   /** Private reactive sources bound to framework selector hooks. */
-  hooks: { panels: ObservableSnapshot<readonly SidebarPanelMetadata[]> }
+  hooks: {
+    /** Live catalog state, for the region the shell renders. */
+    catalog: ISidebarCatalog
+    panels: ObservableSnapshot<readonly SidebarPanelMetadata[]>
+  }
 }
 
 /**

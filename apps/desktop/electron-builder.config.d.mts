@@ -1,6 +1,8 @@
 /** Electron-builder fields asserted by the Desktop release tests. */
 export interface DesktopElectronBuilderConfig {
   readonly appId: string
+  readonly productName: string
+  readonly artifactName: string
   readonly directories: {
     readonly output: string
   }
@@ -12,13 +14,17 @@ export interface DesktopElectronBuilderConfig {
     { readonly from: string, readonly to: 'dsh', readonly filter: readonly ['**/*'] },
     { readonly from: string, readonly to: 'dsh/node_modules', readonly filter: readonly ['**/*'] },
   ]
-  readonly extraMetadata: { readonly dshDesktopAppId: string }
+  readonly extraMetadata: {
+    readonly dshDesktopAppId: string
+    /** Product name a derived distribution shows; absent for the upstream release. */
+    readonly dshDesktopProductName?: string
+    /** Attribution line a derived distribution shows; absent for the upstream release. */
+    readonly dshDesktopAttribution?: string
+  }
   readonly asarUnpack: readonly string[]
-  readonly extraResources: readonly [
-    { readonly from: string, readonly to: 'runtime' },
-    { readonly from: string, readonly to: 'icon.png' },
-  ]
+  readonly extraResources: readonly { readonly from: string, readonly to: string }[]
   readonly mac: {
+    readonly icon: string
     readonly identity: string | undefined
     readonly forceCodeSigning: boolean
     readonly notarize: boolean
@@ -29,6 +35,7 @@ export interface DesktopElectronBuilderConfig {
     readonly writeUpdateInfo: boolean
   }
   readonly win: {
+    readonly icon: string
     readonly forceCodeSigning: boolean
     readonly signtoolOptions: {
       readonly publisherName: string | undefined

@@ -10,12 +10,19 @@ import type {
 } from '../src/client/contract/slots.ts'
 import { HeaderLeadingControls, type HeaderLeadingControlsProps } from '../src/client/HeaderLeadingControls.tsx'
 import { SidebarRoot } from '../src/client/SidebarRoot.tsx'
+import { createSidebarCatalog, type ISidebarCatalog } from '../src/client/catalog.ts'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { en } from '../src/client/locales.ts'
 import { en as commonEn } from '@deepseek-ai/dsh-client-locale/src/locales/en.ts'
 
 // Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
 const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined, reload: () => {} })) as GlobalStandardProps['useResource']
 const usePanelInfo: GlobalStandardProps['usePanelInfo'] = selector => selector({ activePanelId: null })
+// An unclaimed catalog: the shell renders no region at all until a
+// distribution publishes a group, which is the state of every shipped default.
+const emptyCatalog = createSidebarCatalog(() => {})
+const useCatalog: SidebarRootComponentProps['useCatalog'] =
+  selector => selector(emptyCatalog.getSnapshot())
 
 // English-dictionary translate stub: the shell renders the same copy the
 // assertions below query by accessible name.
@@ -36,9 +43,12 @@ type AttentionSnapshot = Parameters<Parameters<SidebarRootComponentProps['useSes
 const noAttention: AttentionSnapshot = new Map()
 const useSessionStatus: SidebarRootComponentProps['useSessionStatus'] = selector => selector(noAttention)
 
-function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; width?: number } = {}) {
+function mountShell({
+  collapsed = false, width = 300, catalog = emptyCatalog,
+}: { collapsed?: boolean; width?: number; catalog?: ISidebarCatalog } = {}) {
   const startSession = vi.fn()
   const toggleSidebar = vi.fn()
+  const selectPanel = vi.fn()
   let regionOwner: SidebarSectionOwnerProps | undefined
   let settingsOwner: SidebarSettingsOwnerProps | undefined
   let footerActionOwner: SidebarFooterActionOwnerProps | undefined
@@ -49,7 +59,8 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
     <SidebarRoot
       collapsed={current.collapsed} width={current.width}
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
-      usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])}
+      usePanelInfo={usePanelInfo} selectPanel={selectPanel} usePanels={selector => selector([])}
+      catalog={catalog} useCatalog={selector => selector(catalog.getSnapshot())}
       useResource={useResource} useWorkspaces={neverHook}
       startSession={startSession} toggleSidebar={toggleSidebar} t={t}
       renderSlot={((
@@ -92,6 +103,7 @@ function mountShell({ collapsed = false, width = 300 }: { collapsed?: boolean; w
       current = { ...current, ...next }
       view.rerender(root())
     },
+    selectPanel,
   }
 }
 
@@ -117,6 +129,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])}
+      catalog={emptyCatalog} useCatalog={useCatalog}
       useResource={useResource} useWorkspaces={neverHook}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
@@ -137,6 +150,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])}
+      catalog={emptyCatalog} useCatalog={useCatalog}
       useResource={useResource} useWorkspaces={neverHook}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
@@ -152,6 +166,7 @@ describe('SidebarRoot shell', () => {
       collapsed={false} width={300}
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])}
+      catalog={emptyCatalog} useCatalog={useCatalog}
       useResource={useResource} useWorkspaces={neverHook}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((_key: string, _owner: unknown, options?: { fallback?: ReactNode }) =>
@@ -159,6 +174,42 @@ describe('SidebarRoot shell', () => {
     />)
 
     expect(screen.getByText('DSH Local Build')).toBeTruthy()
+  })
+
+  it('renders the published catalog region and routes all four of its actions', () => {
+    const panel = 'suixing-agents' as MainPanelId
+    const run = vi.fn()
+    const retry = vi.fn()
+    const catalog = createSidebarCatalog(() => {})
+    catalog.register({
+      id: 'agents',
+      title: 'Agent center',
+      allPanel: panel,
+      entries: [{ id: 'a1', label: 'Listing agent', target: { kind: 'command', run } }],
+    })
+    const b = mountShell({ catalog })
+
+    // The registrant's group renders inside the shell's region wrapper, and an
+    // activated entry both runs its target and moves to the front of recency.
+    fireEvent.click(screen.getByRole('button', { name: 'Listing agent' }))
+    expect(run).toHaveBeenCalledOnce()
+    expect(catalog.getSnapshot().groups[0]?.visible.map(entry => entry.id)).toEqual(['a1'])
+
+    // This shell's translate stub drops template params, so the jump's label
+    // still carries its raw {count} placeholder.
+    fireEvent.click(screen.getByRole('button', { name: /^View all/u }))
+    expect(b.selectPanel).toHaveBeenCalledExactlyOnceWith(panel)
+
+    // The fold decision the row makes is the shell's, recorded on the service.
+    fireEvent.click(screen.getByRole('button', { name: 'Agent center' }))
+    expect(catalog.getSnapshot().groups[0]?.expanded).toBe(false)
+
+    // A degraded load keeps the cached group on screen and offers the retry.
+    catalog.reportStatus('offline', retry)
+    b.rerender({})
+    expect(screen.getByText('Agent center')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: en['catalog.retry'] }))
+    expect(retry).toHaveBeenCalledOnce()
   })
 
   it('hands the region its wide flag and clamps expandSidebar to the collapsed state', () => {
@@ -199,6 +250,7 @@ describe('SidebarRoot shell', () => {
       collapsed width={56}
       useSessions={neverHook} useSessionStatus={useSessionStatus} useSessionRetainInfo={neverHook}
       usePanelInfo={usePanelInfo} selectPanel={() => {}} usePanels={selector => selector([])}
+      catalog={emptyCatalog} useCatalog={useCatalog}
       useResource={useResource} useWorkspaces={neverHook}
       startSession={vi.fn()} toggleSidebar={vi.fn()} t={t}
       renderSlot={((key: string) => key === 'sidebar.toggle.badge'

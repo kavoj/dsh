@@ -25,6 +25,7 @@ import {
   verifyMacOSAppUpdateConfig,
   writeMacOSAppUpdateConfig,
 } from './macos-app-update-config.mjs'
+import { resolveDesktopProductIdentity } from './desktop-product-identity.mjs'
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -41,6 +42,7 @@ export function createElectronBuilderConfig(
   preparedRuntime = undefined,
 ) {
   const appId = resolveDesktopAppId(env)
+  const identity = resolveDesktopProductIdentity(env)
   const policy = resolveDesktopPolicyEnvironment(env)
   const targetPlatform = env.DSH_DESKTOP_TARGET_PLATFORM
   const resolvedPlatform = targetPlatform ?? hostPlatform
@@ -77,9 +79,9 @@ export function createElectronBuilderConfig(
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   return {
     appId,
-    extraMetadata: { dshDesktopAppId: appId, dshMandatoryUpdatePolicy: policy },
-    productName: 'DeepSeek Harness',
-    artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
+    extraMetadata: { dshDesktopAppId: appId, dshMandatoryUpdatePolicy: policy, ...identity.attributionMetadata },
+    productName: identity.productName,
+    artifactName: identity.artifactName,
     directories: { output: unsigned ? join(buildPaths.root, 'unsigned-artifacts') : buildPaths.artifacts },
     asar: true,
     electronDist: buildPaths.electron,
@@ -116,10 +118,11 @@ export function createElectronBuilderConfig(
     ],
     extraResources: [
       { from: buildPaths.runtime, to: 'runtime' },
-      { from: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)), to: 'icon.png' },
+      { from: identity.iconBundled, to: 'icon.png' },
+      ...identity.attributionResources,
     ],
     mac: {
-      icon: fileURLToPath(new URL('../resources/icon-macos.png', import.meta.url)),
+      icon: identity.iconMacOS,
       category: 'public.app-category.developer-tools',
       identity: macOSSigning?.signingIdentity,
       forceCodeSigning: true,
@@ -174,7 +177,7 @@ export function createElectronBuilderConfig(
       )
     },
     win: {
-      icon: fileURLToPath(new URL('../resources/icon-windows.png', import.meta.url)),
+      icon: identity.iconWindows,
       forceCodeSigning: !unsigned,
       signtoolOptions: {
         sign: windowsSigner,

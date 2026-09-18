@@ -125,6 +125,12 @@ describe('client build environment', () => {
       })
     }).toThrow(/DSH_CLIENT_VERSION/)
     expect(() => { resolveClientBuildEnvironment({}, 'unknown') }).toThrow(/unknown client build profile/)
+    expect(resolveClientBuildEnvironment(parent, 'suixing')).toEqual({
+      DSH_CLIENT_BUILD_PROFILE: 'suixing',
+      DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
+      DSH_CLIENT_TITLE: 'SuiXing',
+      DSH_CLIENT_VERSION: '1.2.3',
+    })
     expect(clientBuildProcessEnvironment(parent, {
       DSH_CLIENT_BUILD_PROFILE: 'official',
       DSH_CLIENT_COMMIT_HASH: COMMIT_HASH.slice(0, 7),
