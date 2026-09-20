@@ -45,7 +45,7 @@ export interface DirectoryGroupSpec {
   readonly entries: readonly CapabilitySpec[]
 }
 
-/** The nine AI参谋部 capabilities of the approved prototype. */
+/** The nine AI参谋部 agents of the approved prototype. */
 export type AgentId =
   | 'chief' | 'brand' | 'legal' | 'assistant' | 'copy'
   | 'people' | 'videoIp' | 'eastern' | 'sales'
@@ -53,25 +53,36 @@ export type AgentId =
 /** The four 自动化工厂 scenarios of the approved prototype. */
 export type WorkflowId = 'xhs' | 'campaign' | 'livestream' | 'report'
 
+/**
+ * The four 创作工具 of the approved prototype (Plan §2). They share the Agent
+ * center with the nine agents but carry a creator-confirmation shape: a first
+ * question and a list of confirmation items (用途/比例/数量/时长/人声 …) rather
+ * than the agent's material-only follow-up.
+ */
+export type CreationId = 'ppt' | 'image' | 'video' | 'music'
+
 /** Panel key of the AI参谋部 directory. */
 export const AGENTS_PANEL = 'suixing-agents' as MainPanelId
 
 /** Panel key of the 自动化工厂 directory. */
 export const AUTOMATION_PANEL = 'suixing-automation' as MainPanelId
 
-/** AI参谋部 capabilities, in prototype order. */
+/** AI参谋部 agents, in prototype order. */
 export const AGENT_IDS: readonly AgentId[] = [
   'chief', 'brand', 'legal', 'assistant', 'copy', 'people', 'videoIp', 'eastern', 'sales',
 ]
+
+/** AI参谋部 creation tools, in prototype order. */
+export const CREATION_IDS: readonly CreationId[] = ['ppt', 'image', 'video', 'music']
 
 /** 自动化工厂 scenarios, in prototype order. */
 export const WORKFLOW_IDS: readonly WorkflowId[] = ['xhs', 'campaign', 'livestream', 'report']
 
 /**
- * Build one AI参谋部 capability from its identity.
+ * Build one AI参谋部 agent from its identity.
  * The template keys are computed from `id`, so a missing dictionary key is a
  * compile error rather than a blank row at runtime.
- * @param id - prototype capability id.
+ * @param id - prototype agent id.
  * @returns the capability descriptor.
  */
 function agent(id: AgentId): CapabilitySpec {
@@ -82,6 +93,28 @@ function agent(id: AgentId): CapabilitySpec {
     fields: [
       { termKey: 'field.purpose', valueKey: `entry.${id}.purpose` },
       { termKey: 'field.tasks', valueKey: `entry.${id}.tasks` },
+      { termKey: 'field.material', valueKey: `entry.${id}.material` },
+    ],
+  }
+}
+
+/**
+ * Build one 创作工具 from its identity.
+ * The creator-confirmation shape reuses `purpose`/`tasks`/`material` and adds
+ * `firstQuestion` (the prototype's 第一轮追问) and `confirmItems` (初步确认项).
+ * @param id - prototype creation-tool id.
+ * @returns the capability descriptor.
+ */
+function creation(id: CreationId): CapabilitySpec {
+  return {
+    id,
+    labelKey: `entry.${id}`,
+    hintKey: `entry.${id}.hint`,
+    fields: [
+      { termKey: 'field.purpose', valueKey: `entry.${id}.purpose` },
+      { termKey: 'field.tasks', valueKey: `entry.${id}.tasks` },
+      { termKey: 'field.firstQuestion', valueKey: `entry.${id}.firstQuestion` },
+      { termKey: 'field.confirmItems', valueKey: `entry.${id}.confirmItems` },
       { termKey: 'field.material', valueKey: `entry.${id}.material` },
     ],
   }
@@ -115,7 +148,9 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     titleKey: 'group.agents',
     hintKey: 'group.agents.hint',
     panelId: AGENTS_PANEL,
-    entries: AGENT_IDS.map(agent),
+    // Plan §2: the Agent center hosts the nine agents and the four creation
+    // tools. They share one ordered list so the menu stays a single surface.
+    entries: [...AGENT_IDS.map(agent), ...CREATION_IDS.map(creation)],
   },
   {
     id: 'suixing.automation',

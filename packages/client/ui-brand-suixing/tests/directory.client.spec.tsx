@@ -93,9 +93,10 @@ describe('SuiXing capability directory — published data', () => {
       .toContain(agents?.group.hint)
     expect(agents?.group.allPanel).toBe(AGENTS_PANEL)
     expect(automation?.group.allPanel).toBe(AUTOMATION_PANEL)
-    // The menu shows the shell's recency budget while the group holds all nine.
+    // The menu shows the shell's recency budget while the group holds nine
+    // agents and four creation tools.
     expect(agents?.visible).toHaveLength(5)
-    expect(agents?.total).toBe(9)
+    expect(agents?.total).toBe(13)
     expect(automation?.total).toBe(4)
     // Every capability opens its group's directory until its own page lands.
     for (const view of snapshot.groups) {
@@ -150,7 +151,7 @@ describe('SuiXing capability directory — published data', () => {
   it('keeps capability ids unique across the menus, so recency stays one list', () => {
     const ids = DIRECTORY_GROUPS.flatMap(group => group.entries.map(entry => entry.id))
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toHaveLength(13)
+    expect(ids).toHaveLength(17)
   })
 })
 
@@ -160,16 +161,16 @@ describe('SuiXing capability directory — the page', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI参谋部')
     expect(screen.getByText('Agent中心')).toBeTruthy()
     // The status rides the page banner and marks every capability card.
-    expect(screen.getAllByText('首期接入中').length).toBe(10)
-    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(9)
-    expect(screen.getByText('共 9 项能力')).toBeTruthy()
+    expect(screen.getAllByText('首期接入中').length).toBe(14)
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(13)
+    expect(screen.getByText('共 13 项能力')).toBeTruthy()
   })
 
   it('renders a capability as its lead line plus the prototype definition rows', () => {
     render(<DirectoryPage group={AGENTS} t={zhT} />)
     expect(screen.getByText('总裁决策官')).toBeTruthy()
     expect(screen.getByText('把眼前的难题，理成下一步。')).toBeTruthy()
-    expect(screen.getAllByText('用途说明')).toHaveLength(9)
+    expect(screen.getAllByText('用途说明')).toHaveLength(13)
     expect(screen.getByText('找到增长卡点；比较一个重要决策；梳理未来90天重点。')).toBeTruthy()
     expect(screen.getByText('可以先说业务现状和目标；经营报表有就补充，没有也能开始。')).toBeTruthy()
   })
@@ -236,7 +237,7 @@ describe('SuiXing capability directory — the page', () => {
       runtime.renderRoot()
 
       expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI参谋部')
-      expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(9)
+      expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(13)
       expect(catalog.getSnapshot().groups.map(view => view.group.allPanel)).toEqual([AGENTS_PANEL, AUTOMATION_PANEL])
     } finally {
       await runtime.dispose()
