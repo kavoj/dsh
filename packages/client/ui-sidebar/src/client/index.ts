@@ -23,8 +23,8 @@ export type {
   SidebarRootComponentProps, SidebarRootInjected, SidebarSectionOwnerProps, SidebarSettingsOwnerProps,
 } from './contract/slots.ts'
 export type {
-  CatalogEntry, CatalogEntryTarget, CatalogGroup, CatalogGroupView, CatalogSnapshot, CatalogStatus,
-  ISidebarCatalog,
+  CatalogChild, CatalogEntry, CatalogEntryTarget, CatalogGroup, CatalogGroupView, CatalogSnapshot,
+  CatalogStatus, ISidebarCatalog,
 } from './catalog.ts'
 export type { CatalogRegionProps } from './CatalogGroups.tsx'
 // The factory is public so a registrant's own tests can publish into the same

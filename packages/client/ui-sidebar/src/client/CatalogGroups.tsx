@@ -12,17 +12,25 @@
  * its projects. Those choices are the browser's own preference, held beside
  * the fold state, never an edit of the registrant's configuration.
  *
+ * An entry may carry nested rows (see {@link CatalogChild}): the things that
+ * entry produced and that the user can walk back into. They render indented
+ * under their entry with a status dot, and search matches them, so the region
+ * reads as one list. Regions whose entries publish none are byte-identical to
+ * the ones built before this existed.
+ *
  * The region renders nothing at all without groups, so a distribution that
  * publishes no catalog keeps the sidebar's previous DOM.
  */
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
   Button, DisclosureRow, IconEditOutline16, IconEllipsisOutline16, IconPlusOutline16,
   IconTrashOutline16, Menu, Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { CATALOG_VISIBLE_LIMIT, type CatalogEntry, type CatalogGroupView, type CatalogSnapshot } from './catalog.ts'
+import {
+  CATALOG_VISIBLE_LIMIT, type CatalogChild, type CatalogEntry, type CatalogGroupView, type CatalogSnapshot,
+} from './catalog.ts'
 import css from './CatalogGroups.module.css'
 
 /** Props of the catalog region rendered by the sidebar shell. */
@@ -33,6 +41,8 @@ export interface CatalogRegionProps {
   onToggleGroup: (groupId: string) => void
   /** Record a visit and perform the entry's target. */
   onActivate: (entry: CatalogEntry) => void
+  /** Perform one nested row's target (no recency). */
+  onActivateChild: (child: CatalogChild) => void
   /** Open a group's full directory panel. */
   onSelectPanel: (panelId: MainPanelId) => void
   /** Re-run the registrant's load. */
@@ -48,6 +58,17 @@ export interface CatalogRegionProps {
 }
 
 /**
+ * The one status a nested row shows. Running outranks the unread reminder: a
+ * conversation that is working again is not one waiting for the user.
+ * @param child - the nested row.
+ * @returns the `data-state` the dot renders with.
+ */
+function childState(child: CatalogChild): string {
+  if (child.running === true) return 'running'
+  return child.unread === true ? 'unread' : 'idle'
+}
+
+/**
  * One group's disclosure header plus, when unfolded, its search, rows, and
  * view-all jump. The header rides the shared disclosure chrome, so the whole
  * row and its chevron are the same target and `aria-expanded` is the row's.
@@ -56,8 +77,8 @@ export interface CatalogRegionProps {
  * only appears once you fold it would be a hidden door.
  */
 function CatalogGroupSection({
-  view, onToggleGroup, onActivate, onSelectPanel, onRenameRequest, onDeleteRequest, t,
-}: Pick<CatalogRegionProps, 'onToggleGroup' | 'onActivate' | 'onSelectPanel' | 't'> & {
+  view, onToggleGroup, onActivate, onActivateChild, onSelectPanel, onRenameRequest, onDeleteRequest, t,
+}: Pick<CatalogRegionProps, 'onToggleGroup' | 'onActivate' | 'onActivateChild' | 'onSelectPanel' | 't'> & {
   view: CatalogGroupView
   /** Open the rename dialog for a manageable group. */
   onRenameRequest: (groupId: string, currentTitle: string) => void
@@ -69,8 +90,11 @@ function CatalogGroupSection({
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle === '') return undefined
+    // A conversation nested under an entry is findable by its own title too:
+    // the user reads the sidebar as one list, so search must narrow it as one.
     return view.group.entries.filter(entry => entry.label.toLowerCase().includes(needle)
-      || (entry.hint ?? '').toLowerCase().includes(needle))
+      || (entry.hint ?? '').toLowerCase().includes(needle)
+      || (entry.children ?? []).some(child => child.label.toLowerCase().includes(needle)))
   }, [query, view.group.entries])
   // A search reflects what it matched; the resting list stays on the shell's
   // recency budget so the region never becomes a wall of rows.
@@ -151,15 +175,40 @@ function CatalogGroupSection({
           />
         )}
         {rows.map(entry => (
-          <button
-            key={entry.id}
-            type="button"
-            className={css.entryRow}
-            onClick={() => { onActivate(entry) }}
-          >
-            <span className={css.entryLabel}>{entry.label}</span>
-            {entry.hint !== undefined && <span className={css.entryHint}>{entry.hint}</span>}
-          </button>
+          // A fragment, not a wrapper element: an entry that publishes no
+          // children renders its row alone, so the DOM every earlier build
+          // produced is unchanged.
+          <Fragment key={entry.id}>
+            <button
+              type="button"
+              className={css.entryRow}
+              onClick={() => { onActivate(entry) }}
+            >
+              <span className={css.entryLabel}>{entry.label}</span>
+              {entry.hint !== undefined && <span className={css.entryHint}>{entry.hint}</span>}
+            </button>
+            {entry.children !== undefined && entry.children.length > 0 && (
+              <div
+                className={css.children}
+                role="group"
+                aria-label={t('catalog.children', { name: entry.label })}
+              >
+                {entry.children.map(child => (
+                  <button
+                    key={child.id}
+                    type="button"
+                    className={css.childRow}
+                    aria-current={child.active === true ? 'page' : undefined}
+                    onClick={() => { onActivateChild(child) }}
+                  >
+                    <span className={css.childDot} data-state={childState(child)} aria-hidden="true" />
+                    <span className={css.childLabel}>{child.label}</span>
+                    {child.hint !== undefined && <span className={css.childHint}>{child.hint}</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </Fragment>
         ))}
         {matches !== undefined && rows.length === 0 && (
           <p className={css.noticeHint}>{t('catalog.search.empty')}</p>
@@ -242,7 +291,7 @@ function NameDialog({
  * @returns The region, or the loading/empty/error presentation when no group can render.
  */
 export function CatalogRegion({
-  snapshot, onToggleGroup, onActivate, onSelectPanel, onRetry,
+  snapshot, onToggleGroup, onActivate, onActivateChild, onSelectPanel, onRetry,
   onRenameGroup, onRemoveGroup, onCreateGroup, t,
 }: CatalogRegionProps) {
   // Empty string means "the new-group dialog is open with an empty field".
@@ -311,6 +360,7 @@ export function CatalogRegion({
           view={view}
           onToggleGroup={onToggleGroup}
           onActivate={onActivate}
+          onActivateChild={onActivateChild}
           onSelectPanel={onSelectPanel}
           onRenameRequest={(groupId, currentTitle) => {
             setRenameTarget({ id: groupId, currentTitle })

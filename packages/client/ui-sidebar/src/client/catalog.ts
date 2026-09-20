@@ -35,6 +35,32 @@ export type CatalogEntryTarget =
   | { readonly kind: 'panel'; readonly panelId: MainPanelId }
   | { readonly kind: 'command'; readonly run: () => void }
 
+/**
+ * One row a registrant nests under an entry.
+ *
+ * An entry is a capability; a child is something that capability produced and
+ * that the user can walk back into — in this distribution, the conversations
+ * it started. The shell renders them under their entry and knows nothing else
+ * about them, so a registrant that never publishes children keeps the DOM it
+ * had.
+ */
+export interface CatalogChild {
+  /** Stable identity; in this distribution the Session id. */
+  readonly id: string
+  /** Already-localized row text (normally the conversation's title). */
+  readonly label: string
+  /** Optional secondary line under the label. */
+  readonly hint?: string
+  /** Where activating this row lands. */
+  readonly target: CatalogEntryTarget
+  /** Working right now. */
+  readonly running?: boolean
+  /** Finished while the user was elsewhere and not yet opened. */
+  readonly unread?: boolean
+  /** This row stands for what is currently on screen. */
+  readonly active?: boolean
+}
+
 /** One capability a group offers. */
 export interface CatalogEntry {
   /** Stable identity across reloads; recency is recorded against it. */
@@ -45,6 +71,11 @@ export interface CatalogEntry {
   readonly hint?: string
   /** Where activating this entry lands. */
   readonly target: CatalogEntryTarget
+  /**
+   * Rows nested under this entry, in render order. Empty or absent renders the
+   * entry exactly as it rendered before children existed.
+   */
+  readonly children?: readonly CatalogChild[]
 }
 
 /** One collapsible group of the sidebar catalog. */
@@ -141,6 +172,15 @@ export interface ISidebarCatalog extends ObservableSnapshot<CatalogSnapshot> {
    * @param entry - the activated entry.
    */
   activate(entry: CatalogEntry): void
+  /**
+   * Perform one nested row's target.
+   *
+   * No recency is recorded: a child is a thing the entry already produced, so
+   * visiting it must not promote the entry in the resting list — the entry is
+   * already the row the child hangs from.
+   * @param child - the activated nested row.
+   */
+  activateChild(child: CatalogChild): void
   /**
    * Rename a manageable group for this browser. A group the user added keeps
    * the new name as its own; a registrant's group keeps its published data and
@@ -360,6 +400,10 @@ export function createSidebarCatalog(
       })
       if (entry.target.kind === 'panel') selectPanel(entry.target.panelId)
       else entry.target.run()
+    },
+    activateChild: (child) => {
+      if (child.target.kind === 'panel') selectPanel(child.target.panelId)
+      else child.target.run()
     },
     renameGroup: (groupId, title) => {
       progress.update((draft) => {

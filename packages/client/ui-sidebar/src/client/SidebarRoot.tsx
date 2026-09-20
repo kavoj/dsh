@@ -292,6 +292,7 @@ export function SidebarRoot({
             snapshot={catalogSnapshot}
             onToggleGroup={(groupId) => { catalog.toggleGroup(groupId) }}
             onActivate={(entry) => { catalog.activate(entry) }}
+            onActivateChild={(child) => { catalog.activateChild(child) }}
             onSelectPanel={(panelId) => { selectPanel(panelId) }}
             onRetry={() => { catalog.retry() }}
             onRenameGroup={(groupId, title) => { catalog.renameGroup(groupId, title) }}

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
   CATALOG_VISIBLE_LIMIT, createSidebarCatalog,
-  type CatalogEntry, type CatalogGroup,
+  type CatalogChild, type CatalogEntry, type CatalogGroup,
 } from '../src/client/catalog.ts'
 
 const PANEL = 'test-panel' as MainPanelId
@@ -268,6 +268,49 @@ describe('sidebar catalog registry', () => {
     // First run opens one center; hiding it must open the next, not nothing.
     catalog.removeGroup('a')
     expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['b'])
+    catalog.dispose()
+  })
+})
+
+describe('sidebar catalog nested rows', () => {
+  /** Build one nested row with a command target that records its activation. */
+  function child(id: string, extra: Partial<CatalogChild> = {}): CatalogChild & { runs: number } {
+    const command = { runs: 0 }
+    return {
+      id,
+      label: `Conversation ${id}`,
+      target: { kind: 'command', run: () => { command.runs += 1 } },
+      ...extra,
+      get runs() { return command.runs },
+    }
+  }
+
+  it('carries an entry\'s nested rows through to the view unchanged', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const rows = [child('s1', { active: true }), child('s2', { running: true })]
+    catalog.register(group('a', [{ ...entry('e1'), children: rows }]))
+    const [view] = catalog.getSnapshot().groups
+    expect(view?.visible[0]?.children?.map(row => row.id)).toEqual(['s1', 's2'])
+    catalog.dispose()
+  })
+
+  it('performs a nested row\'s target without recording the entry as visited', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    const row = child('s1')
+    catalog.register(group('a', [{ ...entry('e1'), children: [row] }]))
+    catalog.activateChild(row)
+    expect(row.runs).toBe(1)
+    // The resting list is built from recency: opening a conversation an entry
+    // produced must not promote (or demote) the entry itself.
+    expect(catalog.getSnapshot().groups[0]?.visible[0]?.id).toBe('e1')
+    catalog.dispose()
+  })
+
+  it('selects the panel a nested row names, the same as an entry would', () => {
+    const selectPanel = vi.fn()
+    const catalog = createSidebarCatalog(selectPanel)
+    catalog.activateChild({ id: 's1', label: 'c', target: { kind: 'panel', panelId: PANEL } })
+    expect(selectPanel).toHaveBeenCalledWith(PANEL)
     catalog.dispose()
   })
 })

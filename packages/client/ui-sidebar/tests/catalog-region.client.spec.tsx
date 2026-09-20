@@ -50,6 +50,7 @@ function view({
 function mount(snapshot: Partial<CatalogSnapshot>) {
   const onToggleGroup = vi.fn()
   const onActivate = vi.fn()
+  const onActivateChild = vi.fn()
   const onSelectPanel = vi.fn()
   const onRetry = vi.fn()
   const onRenameGroup = vi.fn()
@@ -63,6 +64,7 @@ function mount(snapshot: Partial<CatalogSnapshot>) {
       snapshot={full}
       onToggleGroup={onToggleGroup}
       onActivate={onActivate}
+      onActivateChild={onActivateChild}
       onSelectPanel={onSelectPanel}
       onRetry={onRetry}
       onRenameGroup={onRenameGroup}
@@ -72,7 +74,7 @@ function mount(snapshot: Partial<CatalogSnapshot>) {
     />,
   )
   return {
-    rendered, onToggleGroup, onActivate, onSelectPanel, onRetry,
+    rendered, onToggleGroup, onActivate, onActivateChild, onSelectPanel, onRetry,
     onRenameGroup, onRemoveGroup, onCreateGroup,
   }
 }
@@ -317,6 +319,78 @@ describe('catalog manage surface', () => {
     })
     expect(screen.getByText(en['catalog.group.empty'])).toBeTruthy()
     expect(screen.queryByRole('searchbox')).toBeNull()
+    b.rendered.unmount()
+  })
+})
+
+describe('catalog region nested rows', () => {
+  /** The same entry, in a build whose registrant published no conversations. */
+  const ENTRY_ONLY = {
+    id: 'e1',
+    label: 'Entry one',
+    target: { kind: 'command' as const, run: () => {} },
+  }
+
+  /** One entry carrying two conversations, one of them the one on screen. */
+  const WITH_CHILDREN = {
+    id: 'e1',
+    label: 'Entry one',
+    target: { kind: 'command' as const, run: () => {} },
+    children: [
+      {
+        id: 's1', label: 'Quarterly review', active: true,
+        target: { kind: 'command' as const, run: () => {} },
+      },
+      {
+        id: 's2', label: 'Draft the brief', running: true,
+        target: { kind: 'command' as const, run: () => {} },
+      },
+    ],
+  }
+
+  it('renders the conversations under their entry, grouped and labelled', () => {
+    const b = mount({ groups: [view({ group: { id: 'a', title: 'Alpha center', entries: [WITH_CHILDREN] }, visible: [WITH_CHILDREN] })] })
+    const group = screen.getByRole('group', { name: 'Conversations under Entry one' })
+    expect(within(group).getByText('Quarterly review')).toBeTruthy()
+    expect(within(group).getByText('Draft the brief')).toBeTruthy()
+    b.rendered.unmount()
+  })
+
+  it('marks the conversation on screen and the one working, on their dots', () => {
+    const b = mount({ groups: [view({ group: { id: 'a', title: 'Alpha center', entries: [WITH_CHILDREN] }, visible: [WITH_CHILDREN] })] })
+    const [current, running] = screen.getAllByRole('button', { name: /Quarterly review|Draft the brief/ })
+    expect(current?.getAttribute('aria-current')).toBe('page')
+    expect(current?.querySelector('[data-state]')?.getAttribute('data-state')).toBe('idle')
+    expect(running?.getAttribute('aria-current')).toBeNull()
+    expect(running?.querySelector('[data-state]')?.getAttribute('data-state')).toBe('running')
+    b.rendered.unmount()
+  })
+
+  it('dispatches a nested row through its own action, not the entry\'s', () => {
+    const b = mount({ groups: [view({ group: { id: 'a', title: 'Alpha center', entries: [WITH_CHILDREN] }, visible: [WITH_CHILDREN] })] })
+    fireEvent.click(screen.getByRole('button', { name: /Quarterly review/ }))
+    expect(b.onActivateChild).toHaveBeenCalledTimes(1)
+    expect((b.onActivateChild.mock.calls[0]?.[0] as { id: string }).id).toBe('s1')
+    expect(b.onActivate).not.toHaveBeenCalled()
+    b.rendered.unmount()
+  })
+
+  it('finds an entry by a conversation it holds', () => {
+    const b = mount({ groups: [view({ group: { id: 'a', title: 'Alpha center', entries: [WITH_CHILDREN] }, visible: [WITH_CHILDREN] })] })
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'quarterly' } })
+    expect(screen.getByText('Entry one')).toBeTruthy()
+    expect(screen.getByText('Quarterly review')).toBeTruthy()
+    b.rendered.unmount()
+  })
+
+  it('renders an entry without conversations exactly as before: no nested group, no dot', () => {
+    const b = mount({ groups: [view({ group: { id: 'a', title: 'Alpha center', entries: [ENTRY_ONLY] }, visible: [ENTRY_ONLY] })] })
+    // The group body itself is the only `group` in the tree: an entry with no
+    // conversations adds neither the labelled container nor a state dot.
+    expect(screen.queryAllByRole('group')).toHaveLength(1)
+    expect(screen.queryByRole('group', { name: 'Conversations under Entry one' })).toBeNull()
+    expect(document.querySelector('[data-state]')).toBeNull()
+    expect(screen.getByText('Entry one')).toBeTruthy()
     b.rendered.unmount()
   })
 })
