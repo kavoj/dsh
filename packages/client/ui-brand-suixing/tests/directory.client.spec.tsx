@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 /**
- * The SuiXing capability directory: the two business menus of the plan's §2.1
+ * The SuiXing capability directory: the four business menus of the plan's §2.1
  * decision arrive as data — a catalog group the sidebar shell renders, the main
  * panel its "view all" opens, and the page definitions those panels show. The
  * dictionaries carry the prototype's own copy, so the tests read what the
  * product approved rather than what implementation invented.
+ *
+ * 创作中心 (老谢 2026-09-20) is covered here twice: as a menu that ships its own
+ * four capabilities, and as the one menu whose cards say where each capability
+ * runs — locally, or through a platform socket.
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -15,10 +19,11 @@ import { createSidebarCatalog } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply, inject } from '../src/client/index.ts'
+import type { BridgeConfig } from '../src/client/bridges/spec.ts'
 import { DirectoryPage, type DirectoryPageProps } from '../src/client/directory/DirectoryPage.tsx'
 import {
-  AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, DIRECTORY_GROUPS, directoryGroup,
-  type DirectoryGroupSpec,
+  AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL,
+  DIRECTORY_GROUPS, directoryGroup, type DirectoryGroupSpec,
 } from '../src/client/directory/specs.ts'
 import { DIRECTORY_NS, directoryEn, directoryZh } from '../src/client/directory/locales.ts'
 
@@ -47,6 +52,14 @@ const zhT = translate(directoryZh)
 /** The groups the prototypes define, by their stable ids. */
 const AGENTS = directoryGroup('suixing.ai-staff') as DirectoryGroupSpec
 const AUTOMATION = directoryGroup('suixing.automation') as DirectoryGroupSpec
+const CREATION = directoryGroup('suixing.creation') as DirectoryGroupSpec
+
+/** A connection configuration handed straight to the page, as a hook. */
+function configHook(config: BridgeConfig) {
+  return function useBridges<Selected>(select: (snapshot: BridgeConfig) => Selected): Selected {
+    return select(config)
+  }
+}
 
 /**
  * A cordis bench carrying the three services the plugin injects: the slot
@@ -76,7 +89,7 @@ describe('SuiXing capability directory — published data', () => {
     expect(inject).toEqual(['locale', 'slots', 'sidebarCatalog'])
   })
 
-  it('publishes both business menus and the panels behind their "view all"', async () => {
+  it('publishes the four business menus and the panels behind their "view all"', async () => {
     vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'suixing')
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })
@@ -86,20 +99,25 @@ describe('SuiXing capability directory — published data', () => {
     expect(snapshot.claimed).toBe(true)
     expect(snapshot.status).toBe('ready')
     expect(snapshot.groups.map(view => view.group.id)).toEqual([
-      'suixing.ai-staff', 'suixing.automation', 'suixing.projects',
+      'suixing.ai-staff', 'suixing.automation', 'suixing.projects', 'suixing.creation',
     ])
-    const [agents, automation] = snapshot.groups
+    const [agents, automation, , creation] = snapshot.groups
     // The runtime's locale decides the wording; both dictionaries carry it.
     expect([directoryZh['group.agents'], directoryEn['group.agents']]).toContain(agents?.group.title)
     expect([directoryZh['group.agents.hint'], directoryEn['group.agents.hint']])
       .toContain(agents?.group.hint)
     expect(agents?.group.allPanel).toBe(AGENTS_PANEL)
     expect(automation?.group.allPanel).toBe(AUTOMATION_PANEL)
-    // The menu shows the shell's recency budget while the group holds nine
-    // agents and four creation tools.
+    expect(creation?.group.allPanel).toBe(CREATION_PANEL)
+    expect([directoryZh['group.creation'], directoryEn['group.creation']])
+      .toContain(creation?.group.title)
+    // The menu shows the shell's recency budget while each group holds its own
+    // capabilities: nine agents, four scenarios, one project note, four
+    // creations.
     expect(agents?.visible).toHaveLength(5)
-    expect(agents?.total).toBe(13)
+    expect(agents?.total).toBe(9)
     expect(automation?.total).toBe(4)
+    expect(creation?.total).toBe(4)
     // Every capability opens its group's directory until its own page lands.
     for (const view of snapshot.groups) {
       for (const entry of view.group.entries) {
@@ -107,9 +125,9 @@ describe('SuiXing capability directory — published data', () => {
       }
     }
     expect(subject.slots.entries('main').map(entry => entry.options.key))
-      .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL])
+      .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL])
     // A first run opens one menu, so the region is never a wall of headers.
-    expect(snapshot.groups.map(view => view.expanded)).toEqual([true, false, false])
+    expect(snapshot.groups.map(view => view.expanded)).toEqual([true, false, false, false])
 
     await fiber.dispose()
     expect(subject.catalog.getSnapshot().claimed).toBe(false)
@@ -163,16 +181,16 @@ describe('SuiXing capability directory — the page', () => {
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI参谋部')
     expect(screen.getByText('Agent中心')).toBeTruthy()
     // The status rides the page banner and marks every capability card.
-    expect(screen.getAllByText('首期接入中').length).toBe(14)
-    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(13)
-    expect(screen.getByText('共 13 项能力')).toBeTruthy()
+    expect(screen.getAllByText('首期接入中').length).toBe(10)
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(9)
+    expect(screen.getByText('共 9 项能力')).toBeTruthy()
   })
 
   it('renders a capability as its lead line plus the prototype definition rows', () => {
     render(<DirectoryPage group={AGENTS} t={zhT} />)
     expect(screen.getByText('总裁决策官')).toBeTruthy()
     expect(screen.getByText('把眼前的难题，理成下一步。')).toBeTruthy()
-    expect(screen.getAllByText('用途说明')).toHaveLength(13)
+    expect(screen.getAllByText('用途说明')).toHaveLength(9)
     expect(screen.getByText('找到增长卡点；比较一个重要决策；梳理未来90天重点。')).toBeTruthy()
     expect(screen.getByText('可以先说业务现状和目标；经营报表有就补充，没有也能开始。')).toBeTruthy()
   })
@@ -186,6 +204,41 @@ describe('SuiXing capability directory — the page', () => {
     }
     expect(screen.getByText('提供资料 → 审核内容 → 准备发布。')).toBeTruthy()
     expect(screen.getByText('共 4 项能力')).toBeTruthy()
+  })
+
+  it('gives 创作中心 its own four capabilities, each saying where it runs', () => {
+    render(<DirectoryPage group={CREATION} t={zhT} />)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('创作中心')
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(4)
+    expect(screen.getByText('共 4 项能力')).toBeTruthy()
+    for (const name of ['PPT生成', '图片生成', '视频制作', '音乐制作']) {
+      expect(screen.getByText(name)).toBeTruthy()
+    }
+    // The creator-confirmation shape, not the agent shape.
+    expect(screen.getAllByText('第一轮追问')).toHaveLength(4)
+    expect(screen.getAllByText('初步确认项')).toHaveLength(4)
+    expect(screen.getByText('图片用在哪里？需要展示什么产品，想让人感受到什么？')).toBeTruthy()
+    // With nothing configured, every capability runs here.
+    expect(screen.getAllByText('本机完成')).toHaveLength(4)
+  })
+
+  it('says which 创作中心 capability the platform runs, and which one is pending', () => {
+    const hooked: BridgeConfig = {
+      baseUrl: 'https://agent.35sz.top',
+      modes: { image: 'platform' },
+      endpoints: {},
+    }
+    render(<DirectoryPage group={CREATION} t={zhT} useBridges={configHook(hooked)} />)
+    expect(screen.getAllByText('平台接口')).toHaveLength(1)
+    expect(screen.getAllByText('本机完成')).toHaveLength(3)
+
+    // Pointed at the platform without an origin: the page says so rather than
+    // presenting an address that would not resolve.
+    const pending: BridgeConfig = { baseUrl: '', modes: { video: 'platform' }, endpoints: {} }
+    cleanup()
+    render(<DirectoryPage group={CREATION} t={zhT} useBridges={configHook(pending)} />)
+    expect(screen.getByText('接口待配置')).toBeTruthy()
+    expect(screen.getAllByText('本机完成')).toHaveLength(3)
   })
 
   it('filters by name and by lead line, and says so when nothing matches', () => {
@@ -239,9 +292,9 @@ describe('SuiXing capability directory — the page', () => {
       runtime.renderRoot()
 
       expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI参谋部')
-      expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(13)
+      expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(9)
       expect(catalog.getSnapshot().groups.map(view => view.group.allPanel))
-        .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL])
+        .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL])
     } finally {
       await runtime.dispose()
     }

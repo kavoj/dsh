@@ -1,6 +1,6 @@
 /**
  * `suixing-directory` namespace: the copy of the SuiXing capability directory —
- * the two business menus, and the page definition every capability carries
+ * the four business menus, and the page definition every capability carries
  * (its lead line, purpose, quick tasks, and material hint). Business names live
  * here rather than in the sidebar shell or in presentation code, so the base
  * layout stays free of them (implementation plan §5.2) and a distribution that
@@ -15,13 +15,15 @@ export const DIRECTORY_NS = 'suixing-directory'
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const directoryZh = {
-  // The two business menus of the plan's §2.1 decision.
+  // The four business menus of the plan's §2.1 decision.
   'group.agents': 'AI参谋部',
   'group.agents.hint': 'Agent中心',
   'group.automation': '自动化工厂',
   'group.automation.hint': 'WorkFlow中心',
   'group.projects': '项目管理',
   'group.projects.hint': '项目中心',
+  'group.creation': '创作中心',
+  'group.creation.hint': 'Creation center',
 
   // The directory template's own copy.
   'page.status': '首期接入中',
@@ -32,6 +34,9 @@ export const directoryZh = {
   'page.local': '你创建的',
   'page.local.hint': '在「设置 → 随星业务中心」用一句话生成并保存的能力，会出现在这里，也会出现在侧栏。',
   'page.local.badge': '本地',
+  'page.bridge.local': '本机完成',
+  'page.bridge.platform': '平台接口',
+  'page.bridge.pending': '接口待配置',
 
   // Field terms shared by the capability definitions.
   'field.purpose': '用途说明',
@@ -92,7 +97,7 @@ export const directoryZh = {
   'entry.sales.tasks': '回应客户的价格异议；准备一轮成交沟通；整理客户跟进计划。',
   'entry.sales.material': '补充客户背景与真实沟通记录即可；涉及个人信息时可先做脱敏。',
 
-  // AI参谋部: four creation tools (Plan §2).
+  // 创作中心: four creation capabilities (Plan §2).
   'entry.ppt': 'PPT生成',
   'entry.ppt.hint': '先把思路讲清，再做成演示。',
   'entry.ppt.purpose': '告诉我这份PPT讲给谁听、希望达成什么目的。先确认大纲，再完善页面。',
@@ -168,6 +173,8 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'group.automation.hint': 'WorkFlow center',
   'group.projects': 'Project Management',
   'group.projects.hint': 'Project center',
+  'group.creation': 'Creation Center',
+  'group.creation.hint': 'Creation center',
 
   'page.status': 'Arriving in the next round',
   'page.status.hint': 'This page is the capability directory; the working pages follow once the platform connections land.',
@@ -177,6 +184,9 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'page.local': 'Built by you',
   'page.local.hint': 'Capabilities you drafted from a sentence in Settings → SuiXing business centres appear here, and in the sidebar.',
   'page.local.badge': 'Local',
+  'page.bridge.local': 'Runs here',
+  'page.bridge.platform': 'Platform call',
+  'page.bridge.pending': 'Endpoint pending',
 
   'field.purpose': 'What it does',
   'field.tasks': 'Three quick tasks',

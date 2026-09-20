@@ -19,16 +19,19 @@ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type { BridgesService } from '../bridges/store.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { DirectoryPage } from './DirectoryPage.tsx'
 import { DIRECTORY_NS, directoryEn, directoryZh, type SuiXingDirectoryKey } from './locales.ts'
-import { AGENTS_PANEL, AUTOMATION_PANEL, DIRECTORY_GROUPS, type DirectoryGroupSpec } from './specs.ts'
+import {
+  AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL, DIRECTORY_GROUPS, type DirectoryGroupSpec,
+} from './specs.ts'
 
 export { DirectoryPage, type DirectoryPageProps } from './DirectoryPage.tsx'
 export { DIRECTORY_NS, directoryEn, directoryZh, type SuiXingDirectoryKey } from './locales.ts'
 export {
-  AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, AGENT_IDS, CREATION_IDS, WORKFLOW_IDS,
-  PROJECT_IDS, DIRECTORY_GROUPS, directoryGroup,
+  AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL,
+  AGENT_IDS, CREATION_IDS, WORKFLOW_IDS, PROJECT_IDS, DIRECTORY_GROUPS, directoryGroup,
   type AgentId, type CreationId, type ProjectId, type WorkflowId,
   type CapabilityField, type CapabilitySpec, type DirectoryGroupSpec,
 } from './specs.ts'
@@ -46,7 +49,8 @@ export interface LocalCapability {
 /**
  * The local capabilities that belong in one group: agents in the AI staff
  * centre, workflows in the automation centre, none in 项目管理 (its model is
- * the platform's, not the local architect's).
+ * the platform's, not the local architect's) nor in 创作中心 (its four
+ * capabilities ship with the product and carry platform sockets instead).
  * @param group - the group being published.
  * @param snapshot - the current business-centre configuration.
  * @returns the local capabilities, in creation order.
@@ -107,26 +111,38 @@ function catalogGroup(
   }
 }
 
+/** Panel keys the connection badge is meaningful on. */
+const BRIDGED_PANELS = new Set<string>([CREATION_PANEL])
+
 /**
  * Register the directory's dictionaries, groups, and panels.
  * @param ctx - Client root context carrying the catalog, slot, and locale services.
  * @param centers - the business-centre configuration the local entries come from.
+ * @param bridges - the capability-connection configuration the pages read.
  */
-export function registerSuiXingDirectory(ctx: ClientContext, centers: CentersService): void {
+export function registerSuiXingDirectory(
+  ctx: ClientContext, centers: CentersService, bridges: BridgesService,
+): void {
   ctx.effect(
     () => ctx.locale.register(DIRECTORY_NS, { zh: directoryZh, en: directoryEn }),
     'ui-brand-suixing: directory dictionaries',
   )
   const t = ctx.locale.bind(DIRECTORY_NS)
   // The panels are keyed slots registered once: their content follows the
-  // store through a bound hook instead, so a new agent shows up in "view all"
-  // without re-registering a component.
+  // stores through bound hooks instead, so a new agent shows up in "view all"
+  // and a new connection shows up on its badge without re-registering a
+  // component.
   for (const group of DIRECTORY_GROUPS) {
     ctx.slots.inject('main', () => ctx.slots.register({
       name: 'main',
       key: group.panelId,
       locale: DIRECTORY_NS,
-      inject: () => ({ group, hooks: { centers } }),
+      inject: () => ({
+        group,
+        hooks: BRIDGED_PANELS.has(group.panelId)
+          ? { centers, bridges }
+          : { centers },
+      }),
     }, DirectoryPage))
   }
   // The sidebar takes plain data, so the catalogue is re-published whenever the

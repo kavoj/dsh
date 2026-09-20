@@ -17,6 +17,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSidebarCatalog } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
+import { createBridgesService } from '../src/client/bridges/store.ts'
 import { CentersSection, type CentersSectionProps } from '../src/client/centers/CentersSection.tsx'
 import { CENTERS_NS, en as centersEn, zh as centersZh } from '../src/client/centers/locales.ts'
 import { createCentersService, type CentersService, type CentersSnapshot } from '../src/client/centers/store.ts'
@@ -310,30 +311,33 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
       inject: ['locale', 'slots', 'sidebarCatalog'],
-      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers) },
+      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
     })
     await fiber.await()
 
     const before = subject.catalog.getSnapshot().groups
-    expect(before.map(view => view.total)).toEqual([13, 4, 1])
+    // The four shipped centres: nine agents, four scenarios, one project
+    // planning entry, and four creations.
+    expect(before.map(view => view.total)).toEqual([9, 4, 1, 4])
 
     const agent = centers.addAgent(draftAgentSpec('帮我审一遍合同里的风险条款'))
     const flow = centers.addWorkflow(draftWorkflowSpec('给客户做一批小红书海报'))
 
     const after = subject.catalog.getSnapshot().groups
-    const [agents, automation, projects] = after
+    const [agents, automation, projects, creation] = after
     // Agents land in the AI staff centre, workflows in the automation centre,
-    // and 项目管理 stays the platform's own.
-    expect(agents?.total).toBe(14)
+    // and 项目管理 / 创作中心 stay as shipped.
+    expect(agents?.total).toBe(10)
     expect(automation?.total).toBe(5)
     expect(projects?.total).toBe(1)
+    expect(creation?.total).toBe(4)
     expect(agents?.group.entries.at(-1)).toMatchObject({ id: agent.id, label: agent.name })
     expect(automation?.group.entries.at(-1)).toMatchObject({ id: flow.id, label: flow.name })
     // The shipped entries keep their order in front of the local ones.
-    expect(agents?.group.entries.slice(0, 13).some(entry => entry.id === agent.id)).toBe(false)
+    expect(agents?.group.entries.slice(0, 9).some(entry => entry.id === agent.id)).toBe(false)
 
     centers.removeAgent(agent.id)
-    expect(subject.catalog.getSnapshot().groups[0]?.total).toBe(13)
+    expect(subject.catalog.getSnapshot().groups[0]?.total).toBe(9)
 
     await fiber.dispose()
     expect(subject.catalog.getSnapshot().claimed).toBe(false)
@@ -344,7 +348,7 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
       inject: ['locale', 'slots', 'sidebarCatalog'],
-      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers) },
+      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
     })
     await fiber.await()
     const [staffGroup, automationGroup] = DIRECTORY_GROUPS

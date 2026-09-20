@@ -8,13 +8,22 @@
  * than a page. The local half arrives through a bound store hook: it is the
  * user's data, it changes while the client runs, and a re-registration per
  * change would be a worse way to say the same thing.
+ *
+ * 创作中心 additionally reads the connection store: each of its four
+ * capabilities says whether it runs here or on the platform, which is the one
+ * fact a user needs before handing work over.
  */
 import { useMemo, useState } from 'react'
 import type { PropsLocale, Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
+import { bridge, bridgeStatus, type BridgeConfig } from '../bridges/spec.ts'
+import type { BridgesSnapshot } from '../bridges/store.ts'
 import type { CentersSnapshot } from '../centers/store.ts'
 import { DIRECTORY_NS, type SuiXingDirectoryKey } from './locales.ts'
-import { AGENTS_PANEL, AUTOMATION_PANEL, type CapabilitySpec, type DirectoryGroupSpec } from './specs.ts'
+import {
+  AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL,
+  type CapabilitySpec, type DirectoryGroupSpec,
+} from './specs.ts'
 import css from './DirectoryPage.module.css'
 
 /** The namespace-bound translate seat this page reads. */
@@ -39,12 +48,20 @@ const NO_CENTERS: CentersSnapshot = {
 /** Selector hook over nothing: the stable fallback for `useCenters`. */
 const noCenters: SnapshotSelectorHook<CentersSnapshot> = select => select(NO_CENTERS)
 
+/** The connection configuration a page renders when none was injected. */
+const NO_BRIDGES: BridgeConfig = { baseUrl: '', modes: {}, endpoints: {} }
+
+/** Selector hook over nothing: the stable fallback for `useBridges`. */
+const noBridges: SnapshotSelectorHook<BridgesSnapshot> = select => select(NO_BRIDGES)
+
 /** Composed props the main slot renderer supplies to a directory page. */
 export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   /** The menu this panel is the directory of. */
   readonly group: DirectoryGroupSpec
   /** Business-centre snapshot hook; absent renders the shipped capabilities only. */
   readonly useCenters?: SnapshotSelectorHook<CentersSnapshot> | undefined
+  /** Connection snapshot hook; absent renders every capability as local. */
+  readonly useBridges?: SnapshotSelectorHook<BridgesSnapshot> | undefined
 }
 
 /**
@@ -81,14 +98,37 @@ function localRows(group: DirectoryGroupSpec, snapshot: CentersSnapshot): readon
 }
 
 /**
+ * The connection badge of one capability: where it runs, in the user's words.
+ * @param capability - the capability being rendered.
+ * @param config - the connection configuration.
+ * @param t - namespace translate seat.
+ * @returns the badge text, or null when the capability has no socket.
+ */
+function bridgeBadge(
+  capability: CapabilitySpec, config: BridgeConfig, t: DirectoryTranslate,
+): string | null {
+  const spec = bridge(capability.id)
+  if (spec === undefined) return null
+  const status = bridgeStatus(config, spec)
+  if (status === 'ready') return t('page.bridge.platform')
+  if (status === 'pending') return t('page.bridge.pending')
+  return t('page.bridge.local')
+}
+
+/**
  * Render one business menu's capability directory.
  * @param props - the group descriptor, the centres hook, and the translate seat.
  * @returns the directory page.
  */
-export function DirectoryPage({ group, useCenters = noCenters, t }: DirectoryPageProps) {
+export function DirectoryPage({
+  group, useCenters = noCenters, useBridges = noBridges, t,
+}: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
   const snapshot = useCenters(state => state)
+  const bridges = useBridges(state => state)
+  // Only 创作中心 carries sockets; every other menu keeps the status badge.
+  const showsConnections = group.panelId === CREATION_PANEL
   const shipped = useMemo(
     () => group.entries.filter(capability => matches(capability, needle, t)),
     [group.entries, needle, t],
@@ -123,7 +163,10 @@ export function DirectoryPage({ group, useCenters = noCenters, t }: DirectoryPag
           <li key={capability.id} className={css.card}>
             <div className={css.cardHead}>
               <h2 className={css.cardName}>{t(capability.labelKey)}</h2>
-              <span className={css.badge}>{t('page.status')}</span>
+              <span className={css.badge}>
+                {(showsConnections ? bridgeBadge(capability, bridges, t) : null)
+                  ?? t('page.status')}
+              </span>
             </div>
             <p className={css.cardLead}>{t(capability.hintKey)}</p>
             <dl className={css.fields}>

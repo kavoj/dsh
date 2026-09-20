@@ -5,6 +5,11 @@
  * rather than one page per capability — lives in these descriptors: a group,
  * its menu copy, the main panel its directory opens, and the definition rows
  * every capability inside it renders. The sidebar shell owns none of it.
+ *
+ * 老谢 2026-09-20: 创作中心 is the fourth business menu, seated below
+ * 项目管理. The four creation tools moved out of AI参谋部 into it, so each
+ * menu now names one kind of work: agents, workflow scenarios, projects, and
+ * creations.
  */
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SuiXingDirectoryKey } from './locales.ts'
@@ -43,7 +48,7 @@ export interface DirectoryGroupSpec {
   readonly panelId: MainPanelId
   /**
    * Whether the sidebar may rename, remove, and add around this group. All
-   * three SuiXing centres are manageable: the plan treats them as the user's
+   * four SuiXing centres are manageable: the plan treats them as the user's
    * own business areas, and the sidebar's manage surface keeps those choices
    * browser-local, so nothing here is ever edited from the client. Required
    * rather than optional, so a centre added later states the decision instead
@@ -63,10 +68,11 @@ export type AgentId =
 export type WorkflowId = 'xhs' | 'campaign' | 'livestream' | 'report'
 
 /**
- * The four 创作工具 of the approved prototype (Plan §2). They share the Agent
- * center with the nine agents but carry a creator-confirmation shape: a first
- * question and a list of confirmation items (用途/比例/数量/时长/人声 …) rather
- * than the agent's material-only follow-up.
+ * The four 创作中心 capabilities of the approved prototype (Plan §2). They
+ * carry a creator-confirmation shape: a first question and a list of
+ * confirmation items (用途/比例/数量/时长/人声 …) rather than the agent's
+ * material-only follow-up, and each one names a platform call it can be
+ * pointed at (see `bridges/spec.ts`).
  */
 export type CreationId = 'ppt' | 'image' | 'video' | 'music'
 
@@ -88,12 +94,15 @@ export const AUTOMATION_PANEL = 'suixing-automation' as MainPanelId
 /** Panel key of the 项目管理 directory. */
 export const PROJECTS_PANEL = 'suixing-projects' as MainPanelId
 
+/** Panel key of the 创作中心 directory. */
+export const CREATION_PANEL = 'suixing-creation' as MainPanelId
+
 /** AI参谋部 agents, in prototype order. */
 export const AGENT_IDS: readonly AgentId[] = [
   'chief', 'brand', 'legal', 'assistant', 'copy', 'people', 'videoIp', 'eastern', 'sales',
 ]
 
-/** AI参谋部 creation tools, in prototype order. */
+/** 创作中心 capabilities, in prototype order. */
 export const CREATION_IDS: readonly CreationId[] = ['ppt', 'image', 'video', 'music']
 
 /** 自动化工厂 scenarios, in prototype order. */
@@ -123,10 +132,10 @@ function agent(id: AgentId): CapabilitySpec {
 }
 
 /**
- * Build one 创作工具 from its identity.
+ * Build one 创作中心 capability from its identity.
  * The creator-confirmation shape reuses `purpose`/`tasks`/`material` and adds
  * `firstQuestion` (the prototype's 第一轮追问) and `confirmItems` (初步确认项).
- * @param id - prototype creation-tool id.
+ * @param id - prototype creation id.
  * @returns the capability descriptor.
  */
 function creation(id: CreationId): CapabilitySpec {
@@ -184,7 +193,7 @@ function project(id: ProjectId): CapabilitySpec {
   }
 }
 
-/** The three business menus this distribution publishes, in menu order. */
+/** The four business menus this distribution publishes, in menu order. */
 export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
   {
     id: 'suixing.ai-staff',
@@ -193,9 +202,9 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     hintKey: 'group.agents.hint',
     panelId: AGENTS_PANEL,
     manageable: true,
-    // Plan §2: the Agent center hosts the nine agents and the four creation
-    // tools. They share one ordered list so the menu stays a single surface.
-    entries: [...AGENT_IDS.map(agent), ...CREATION_IDS.map(creation)],
+    // Plan §2: nine agents, one menu. The four creation tools used to share
+    // this list; they now own 创作中心, so each menu names one kind of work.
+    entries: AGENT_IDS.map(agent),
   },
   {
     id: 'suixing.automation',
@@ -217,6 +226,19 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     // concrete project model (per-project isolation, unsent drafts) comes with
     // the platform project/workspace API; one planning entry ships first.
     entries: PROJECT_IDS.map(project),
+  },
+  {
+    id: 'suixing.creation',
+    order: 40,
+    titleKey: 'group.creation',
+    hintKey: 'group.creation.hint',
+    panelId: CREATION_PANEL,
+    manageable: true,
+    // 老谢 2026-09-20: 创作中心 sits below 项目管理 and holds the four
+    // creation capabilities. It behaves like the other centres — same manage
+    // surface, same one-sentence drafting — and each capability additionally
+    // names a platform call it can be pointed at (bridges/spec.ts).
+    entries: CREATION_IDS.map(creation),
   },
 ]
 
