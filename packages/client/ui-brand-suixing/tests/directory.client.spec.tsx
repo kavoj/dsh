@@ -17,7 +17,7 @@ import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply, inject } from '../src/client/index.ts'
 import { DirectoryPage, type DirectoryPageProps } from '../src/client/directory/DirectoryPage.tsx'
 import {
-  AGENTS_PANEL, AUTOMATION_PANEL, DIRECTORY_GROUPS, directoryGroup,
+  AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, DIRECTORY_GROUPS, directoryGroup,
   type DirectoryGroupSpec,
 } from '../src/client/directory/specs.ts'
 import { DIRECTORY_NS, directoryEn, directoryZh } from '../src/client/directory/locales.ts'
@@ -85,7 +85,9 @@ describe('SuiXing capability directory — published data', () => {
     const snapshot = subject.catalog.getSnapshot()
     expect(snapshot.claimed).toBe(true)
     expect(snapshot.status).toBe('ready')
-    expect(snapshot.groups.map(view => view.group.id)).toEqual(['suixing.ai-staff', 'suixing.automation'])
+    expect(snapshot.groups.map(view => view.group.id)).toEqual([
+      'suixing.ai-staff', 'suixing.automation', 'suixing.projects',
+    ])
     const [agents, automation] = snapshot.groups
     // The runtime's locale decides the wording; both dictionaries carry it.
     expect([directoryZh['group.agents'], directoryEn['group.agents']]).toContain(agents?.group.title)
@@ -105,9 +107,9 @@ describe('SuiXing capability directory — published data', () => {
       }
     }
     expect(subject.slots.entries('main').map(entry => entry.options.key))
-      .toEqual([AGENTS_PANEL, AUTOMATION_PANEL])
+      .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL])
     // A first run opens one menu, so the region is never a wall of headers.
-    expect(snapshot.groups.map(view => view.expanded)).toEqual([true, false])
+    expect(snapshot.groups.map(view => view.expanded)).toEqual([true, false, false])
 
     await fiber.dispose()
     expect(subject.catalog.getSnapshot().claimed).toBe(false)
@@ -151,7 +153,7 @@ describe('SuiXing capability directory — published data', () => {
   it('keeps capability ids unique across the menus, so recency stays one list', () => {
     const ids = DIRECTORY_GROUPS.flatMap(group => group.entries.map(entry => entry.id))
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids).toHaveLength(17)
+    expect(ids).toHaveLength(18)
   })
 })
 
@@ -238,7 +240,8 @@ describe('SuiXing capability directory — the page', () => {
 
       expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('AI参谋部')
       expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(13)
-      expect(catalog.getSnapshot().groups.map(view => view.group.allPanel)).toEqual([AGENTS_PANEL, AUTOMATION_PANEL])
+      expect(catalog.getSnapshot().groups.map(view => view.group.allPanel))
+        .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL])
     } finally {
       await runtime.dispose()
     }

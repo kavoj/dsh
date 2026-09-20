@@ -20,6 +20,8 @@ export const directoryZh = {
   'group.agents.hint': 'Agent中心',
   'group.automation': '自动化工厂',
   'group.automation.hint': 'WorkFlow中心',
+  'group.projects': '项目管理',
+  'group.projects.hint': '项目中心',
 
   // The directory template's own copy.
   'page.status': '首期接入中',
@@ -146,6 +148,13 @@ export const directoryZh = {
   'entry.report.result': '经营摘要、趋势汇总与待核实问题。',
   'entry.report.steps': '提供资料 → 确认口径 → 查看报告。',
   'entry.report.note': '不会把缺失数据当成零；先确认日期与指标口径。',
+
+  // 项目管理: one planning entry until the platform project API lands.
+  'entry.projects.home': '项目中心',
+  'entry.projects.home.hint': '项目区与两个业务中心并列，按项目归集内容。',
+  'entry.projects.home.purpose': '按项目归集对话、资料、作品与工作流结果；切换项目时隔离内容并保留未发送草稿（待接入平台能力）。',
+  'entry.projects.home.tasks': '新建项目；切换当前项目；查看项目内的对话与作品。',
+  'entry.projects.home.material': '项目能力依赖平台项目/工作区接口，接入前此处为规划说明。',
 } as const
 
 /** English dictionary, key-identical to the Chinese source of truth. */
@@ -154,6 +163,8 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'group.agents.hint': 'Agent center',
   'group.automation': 'Automation Factory',
   'group.automation.hint': 'WorkFlow center',
+  'group.projects': 'Project Management',
+  'group.projects.hint': 'Project center',
 
   'page.status': 'Arriving in the next round',
   'page.status.hint': 'This page is the capability directory; the working pages follow once the platform connections land.',
@@ -275,6 +286,13 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'entry.report.result': 'An operations summary, trend roll-up, and open questions.',
   'entry.report.steps': 'Provide material → confirm definitions → read the report.',
   'entry.report.note': 'Missing data is never counted as zero; period and metric definitions are confirmed first.',
+
+  // 项目管理: one planning entry until the platform project API lands.
+  'entry.projects.home': 'Project Hub',
+  'entry.projects.home.hint': 'Parallel to the two business centers; groups content per project.',
+  'entry.projects.home.purpose': 'Group conversations, files, works, and workflow results per project; isolate content and keep unsent drafts on switch (pending platform capability).',
+  'entry.projects.home.tasks': "Create a project; switch the active project; review a project's conversations and works.",
+  'entry.projects.home.material': 'Project capabilities depend on the platform project/workspace API; this is a planning note until that lands.',
 }
 
 /** Key domain of the `suixing-directory` namespace (zh is the source of truth). */

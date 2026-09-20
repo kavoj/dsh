@@ -33,7 +33,7 @@ export interface CapabilitySpec {
 export interface DirectoryGroupSpec {
   /** Stable group identity; the fold state is recorded against it. */
   readonly id: string
-  /** Menu order; the plan puts AI参谋部 above 自动化工厂. */
+  /** Menu order; the plan puts AI参谋部 above 自动化工厂, 项目管理 below both. */
   readonly order: number
   /** Menu title. */
   readonly titleKey: SuiXingDirectoryKey
@@ -61,11 +61,23 @@ export type WorkflowId = 'xhs' | 'campaign' | 'livestream' | 'report'
  */
 export type CreationId = 'ppt' | 'image' | 'video' | 'music'
 
+/**
+ * The 项目管理 group of the approved prototype (页面引导与交互说明 §1/§5).
+ * It sits *parallel* to the two business centers and groups conversations,
+ * files, works, and workflow results per project. The concrete project model
+ * arrives with the platform's project/workspace API, so this distribution
+ * publishes one planning entry until that lands (DEC-03 fallback).
+ */
+export type ProjectId = 'home'
+
 /** Panel key of the AI参谋部 directory. */
 export const AGENTS_PANEL = 'suixing-agents' as MainPanelId
 
 /** Panel key of the 自动化工厂 directory. */
 export const AUTOMATION_PANEL = 'suixing-automation' as MainPanelId
+
+/** Panel key of the 项目管理 directory. */
+export const PROJECTS_PANEL = 'suixing-projects' as MainPanelId
 
 /** AI参谋部 agents, in prototype order. */
 export const AGENT_IDS: readonly AgentId[] = [
@@ -77,6 +89,9 @@ export const CREATION_IDS: readonly CreationId[] = ['ppt', 'image', 'video', 'mu
 
 /** 自动化工厂 scenarios, in prototype order. */
 export const WORKFLOW_IDS: readonly WorkflowId[] = ['xhs', 'campaign', 'livestream', 'report']
+
+/** 项目管理 entries (placeholder until the platform project API lands). */
+export const PROJECT_IDS: readonly ProjectId[] = ['home']
 
 /**
  * Build one AI参谋部 agent from its identity.
@@ -140,7 +155,27 @@ function workflow(id: WorkflowId): CapabilitySpec {
   }
 }
 
-/** The two business menus this distribution publishes, in menu order. */
+/**
+ * Build one 项目管理 entry from its identity.
+ * The planning entry mirrors the agent shape so the directory renders it
+ * without a bespoke page; its copy marks it pending the platform project API.
+ * @param id - project entry id.
+ * @returns the capability descriptor.
+ */
+function project(id: ProjectId): CapabilitySpec {
+  return {
+    id,
+    labelKey: `entry.projects.${id}`,
+    hintKey: `entry.projects.${id}.hint`,
+    fields: [
+      { termKey: 'field.purpose', valueKey: `entry.projects.${id}.purpose` },
+      { termKey: 'field.tasks', valueKey: `entry.projects.${id}.tasks` },
+      { termKey: 'field.material', valueKey: `entry.projects.${id}.material` },
+    ],
+  }
+}
+
+/** The three business menus this distribution publishes, in menu order. */
 export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
   {
     id: 'suixing.ai-staff',
@@ -159,6 +194,17 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     hintKey: 'group.automation.hint',
     panelId: AUTOMATION_PANEL,
     entries: WORKFLOW_IDS.map(workflow),
+  },
+  {
+    id: 'suixing.projects',
+    order: 30,
+    titleKey: 'group.projects',
+    hintKey: 'group.projects.hint',
+    panelId: PROJECTS_PANEL,
+    // Prototype §5: 项目管理 is parallel to the two business centers. The
+    // concrete project model (per-project isolation, unsent drafts) comes with
+    // the platform project/workspace API; one planning entry ships first.
+    entries: PROJECT_IDS.map(project),
   },
 ]
 
