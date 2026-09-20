@@ -58,8 +58,9 @@ export {
   type OutputKind, type WorkflowDraft, type WorkflowSpec,
 } from './centers/spec.ts'
 
-/** Required services: the UI slot registry, the locale registry, and the sidebar's catalogue. */
-export const inject = ['locale', 'slots', 'sidebarCatalog']
+/** Required services: the UI slot registry, the locale registry, the sidebar's
+ * catalogue, and the panel selector an activated entry navigates with. */
+export const inject = ['locale', 'slots', 'sidebarCatalog', 'layout']
 
 /** Nav order of the business-centre page: after every base settings section. */
 const CENTERS_SECTION_ORDER = 30

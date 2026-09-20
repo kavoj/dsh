@@ -9,6 +9,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
+import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSidebarCatalog } from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -24,6 +25,17 @@ afterEach(() => {
 
 const HOLES = ['sidebar.brand.mark', 'sidebar.brand.name'] as const
 
+/** The panel selector the directory navigates with, as ui-layout exposes it. */
+function fakeLayout(): ILayout {
+  return {
+    selectPanel: vi.fn(),
+    beginNavigation: () => new AbortController().signal,
+    toggleSidebar: vi.fn(),
+    openRightbar: vi.fn(),
+    closeRightbar: vi.fn(),
+  }
+}
+
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
@@ -38,6 +50,7 @@ async function bench() {
   } as never, () => null)
   ctx.provide('locale', new LocaleRuntime(ctx))
   ctx.provide('sidebarCatalog', createSidebarCatalog(() => {}))
+  ctx.provide('layout', fakeLayout())
   return { ctx, slots }
 }
 
@@ -47,7 +60,7 @@ describe('SuiXing browser-brand plugin', () => {
   })
 
   it('declares only the services it uses', () => {
-    expect(inject).toEqual(['locale', 'slots', 'sidebarCatalog'])
+    expect(inject).toEqual(['locale', 'slots', 'sidebarCatalog', 'layout'])
   })
 
   it('leaves the official and local builds unchanged', async () => {

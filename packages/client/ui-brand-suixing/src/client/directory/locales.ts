@@ -50,6 +50,28 @@ export const directoryZh = {
   'field.steps': '页面步骤',
   'field.note': '关键提示',
 
+  // The capability page (2026-09-20): what a card opens. The socket block is
+  // 创作中心's own fact — the address the capability resolves to and the rung
+  // that answers it — so it is stated once, here, for the page and the badge.
+  'page.bridge.title': '能力接入点',
+  'page.bridge.reserved': '预留，未启用',
+  'page.bridge.configured': '由「设置 → 随星能力接入」配置',
+  'page.open': '查看 {name} 的能力详情',
+  'page.open.label': '详情',
+  'detail.crumb': '能力详情导航',
+  'detail.back': '返回目录',
+  'detail.local.origin': '在「设置 → 随星业务中心」用一句话创建，改动会同步到侧栏。',
+  'detail.local.prompt': '系统提示词',
+  'detail.local.opening': '开场白',
+  'detail.local.starters': '引导问题',
+  'detail.local.steps': '流水线步骤',
+  'detail.local.assumptions': '参谋官替你做的假设',
+  'detail.start.agent': '开始对话',
+  'detail.start.creation': '开始创作',
+  'detail.start.workflow': '开始任务',
+  'detail.start.project': '打开项目中心',
+  'detail.start.hint': '当前在随星会话中进行；接入平台后改由平台执行。',
+
   // AI参谋部: nine agents.
   'entry.chief': '总裁决策官',
   'entry.chief.hint': '把眼前的难题，理成下一步。',
@@ -198,6 +220,28 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'field.result': 'Expected result',
   'field.steps': 'Page steps',
   'field.note': 'Key reminder',
+
+  // The capability page (2026-09-20): what a card opens. The socket block is
+  // 创作中心's own fact — the address the capability resolves to and the rung
+  // that answers it — so it is stated once, here, for the page and the badge.
+  'page.bridge.title': 'Connection point',
+  'page.bridge.reserved': 'Reserved, not in use',
+  'page.bridge.configured': 'Set in Settings → SuiXing capability connections',
+  'page.open': 'Open the {name} capability page',
+  'page.open.label': 'Details',
+  'detail.crumb': 'Capability page navigation',
+  'detail.back': 'Back to the directory',
+  'detail.local.origin': 'Created from one sentence in Settings → SuiXing business centres; changes reach the sidebar.',
+  'detail.local.prompt': 'System prompt',
+  'detail.local.opening': 'Opening line',
+  'detail.local.starters': 'Starter questions',
+  'detail.local.steps': 'Pipeline steps',
+  'detail.local.assumptions': 'Assumptions the architect made',
+  'detail.start.agent': 'Start chat',
+  'detail.start.creation': 'Start creating',
+  'detail.start.workflow': 'Start task',
+  'detail.start.project': 'Open project hub',
+  'detail.start.hint': 'Runs in a SuiXing conversation today; the platform runs it once connected.',
 
   'entry.chief': 'Chief Decision Officer',
   'entry.chief.hint': 'Turn the problem in front of you into a next step.',

@@ -9,10 +9,16 @@
  * 创作中心 (老谢 2026-09-20) is covered here twice: as a menu that ships its own
  * four capabilities, and as the one menu whose cards say where each capability
  * runs — locally, or through a platform socket.
+ *
+ * The detail page is covered the same way the prototype draws it: a sidebar
+ * entry and a card are one navigation that lands on the capability itself, and
+ * the page behind it carries the definition rows plus the two facts a card
+ * cannot hold — where it runs and what starts it.
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { ILayout, MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSidebarCatalog } from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -20,6 +26,8 @@ import { SlotTestRuntime } from '@deepseek-ai/dsh-client-test-runtime'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { apply, inject } from '../src/client/index.ts'
 import type { BridgeConfig } from '../src/client/bridges/spec.ts'
+import type { AgentSpec, WorkflowSpec } from '../src/client/centers/spec.ts'
+import type { CentersSnapshot } from '../src/client/centers/store.ts'
 import { DirectoryPage, type DirectoryPageProps } from '../src/client/directory/DirectoryPage.tsx'
 import {
   AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL,
@@ -30,6 +38,7 @@ import { DIRECTORY_NS, directoryEn, directoryZh } from '../src/client/directory/
 afterEach(() => {
   cleanup()
   vi.unstubAllEnvs()
+  localStorage.clear()
 })
 
 /** Translate stub over one dictionary, template params substituted. */
@@ -61,10 +70,65 @@ function configHook(config: BridgeConfig) {
   }
 }
 
+/** A focused capability handed straight to the page, as a hook. */
+function focusHook(id: string | null) {
+  return function useFocus<Selected>(select: (snapshot: string | null) => Selected): Selected {
+    return select(id)
+  }
+}
+
+/** A centres configuration handed straight to the page, as a hook. */
+function centersHook(snapshot: CentersSnapshot) {
+  return function useCenters<Selected>(select: (value: CentersSnapshot) => Selected): Selected {
+    return select(snapshot)
+  }
+}
+
+/** The panel selector the directory navigates with, as ui-layout exposes it. */
+function fakeLayout(selectPanel: (panelId: MainPanelId | null) => void): ILayout {
+  return {
+    selectPanel,
+    beginNavigation: () => new AbortController().signal,
+    toggleSidebar: vi.fn(),
+    openRightbar: vi.fn(),
+    closeRightbar: vi.fn(),
+  }
+}
+
+/** An agent the architect built on this machine, as the detail page reads it. */
+const LOCAL_AGENT: AgentSpec = {
+  id: 'local.agent.1',
+  name: '面料合规顾问',
+  oneLiner: '按国标看成分与标识。',
+  role: 'specialist',
+  rolePrompt: '你是纺织面料合规顾问，只依据国标回答成分与标识问题。',
+  guardrails: ['不给出法律结论'],
+  tools: ['knowledge'],
+  datasets: [],
+  openingStatement: '把面料成分表发我，我按国标读一遍。',
+  starters: ['这个成分可以标全棉吗？'],
+  inputs: [{ key: 'fabric', label: '面料成分', required: true }],
+  outputContract: '一份合规意见',
+  assumptions: ['默认按 GB/T 29862 读标识'],
+}
+
+/** A workflow the architect built on this machine. */
+const LOCAL_FLOW: WorkflowSpec = {
+  id: 'local.flow.1',
+  name: '经营周报流水线',
+  oneLiner: '把一周数据整理成周报。',
+  scope: 'private',
+  steps: [
+    { stepKey: 'collect', name: '汇总数据', prompt: '汇总本周经营数据', kind: 'text' },
+    { stepKey: 'write', name: '写周报', prompt: '按结论写一份周报', kind: 'text' },
+  ],
+  assumptions: ['默认按自然周汇总'],
+}
+
 /**
- * A cordis bench carrying the three services the plugin injects: the slot
- * registry with the seats ui-layout declares, the locale runtime, and a real
- * sidebar catalog the plugin publishes into.
+ * A cordis bench carrying the four services the plugin injects: the slot
+ * registry with the seats ui-layout declares, the locale runtime, a real
+ * sidebar catalog the plugin publishes into, and the panel selector.
  */
 async function bench() {
   const ctx = new Context()
@@ -81,12 +145,14 @@ async function bench() {
   ctx.provide('locale', new LocaleRuntime(ctx))
   const catalog = createSidebarCatalog(() => {})
   ctx.provide('sidebarCatalog', catalog)
-  return { ctx, slots, catalog }
+  const selectPanel = vi.fn()
+  ctx.provide('layout', fakeLayout(selectPanel))
+  return { ctx, slots, catalog, selectPanel }
 }
 
 describe('SuiXing capability directory — published data', () => {
   it('declares only the services it uses', () => {
-    expect(inject).toEqual(['locale', 'slots', 'sidebarCatalog'])
+    expect(inject).toEqual(['locale', 'slots', 'sidebarCatalog', 'layout'])
   })
 
   it('publishes the four business menus and the panels behind their "view all"', async () => {
@@ -118,16 +184,22 @@ describe('SuiXing capability directory — published data', () => {
     expect(agents?.total).toBe(9)
     expect(automation?.total).toBe(4)
     expect(creation?.total).toBe(4)
-    // Every capability opens its group's directory until its own page lands.
+    // Every entry navigates: it focuses the capability and selects the menu's
+    // panel, so the sidebar lands on the capability rather than on the list.
     for (const view of snapshot.groups) {
-      for (const entry of view.group.entries) {
-        expect(entry.target).toEqual({ kind: 'panel', panelId: view.group.allPanel })
-      }
+      for (const entry of view.group.entries) expect(entry.target.kind).toBe('command')
     }
     expect(subject.slots.entries('main').map(entry => entry.options.key))
       .toEqual([AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL])
     // A first run opens one menu, so the region is never a wall of headers.
     expect(snapshot.groups.map(view => view.expanded)).toEqual([true, false, false, false])
+
+    // Activating an entry is the navigation itself: one panel selection, and
+    // the focus the panel reads.
+    const image = creation?.group.entries.find(entry => entry.id === 'image')
+    if (image?.target.kind !== 'command') throw new Error('the image entry stopped navigating')
+    image.target.run()
+    expect(subject.selectPanel).toHaveBeenCalledWith(CREATION_PANEL)
 
     await fiber.dispose()
     expect(subject.catalog.getSnapshot().claimed).toBe(false)
@@ -166,6 +238,15 @@ describe('SuiXing capability directory — published data', () => {
         }
       }
     }
+    // The detail page's own copy, keyed here so a missing line fails loudly.
+    for (const key of [
+      'page.bridge.title', 'page.bridge.reserved', 'page.bridge.configured',
+      'page.open', 'page.open.label', 'detail.crumb', 'detail.back',
+      'detail.local.origin', 'detail.local.prompt', 'detail.local.opening',
+      'detail.local.starters', 'detail.local.steps', 'detail.local.assumptions',
+      'detail.start.agent', 'detail.start.creation', 'detail.start.workflow',
+      'detail.start.project', 'detail.start.hint',
+    ]) filled(key)
   })
 
   it('keeps capability ids unique across the menus, so recency stays one list', () => {
@@ -280,6 +361,7 @@ describe('SuiXing capability directory — the page', () => {
         apply(ctx: Context) {
           ctx.provide('locale', locale)
           ctx.provide('sidebarCatalog', catalog)
+          ctx.provide('layout', fakeLayout(vi.fn()))
           ctx.slots.installLocale(locale)
         },
       })
@@ -298,5 +380,112 @@ describe('SuiXing capability directory — the page', () => {
     } finally {
       await runtime.dispose()
     }
+  })
+})
+
+describe('SuiXing capability directory — one capability in full', () => {
+  it('opens a capability from its card', () => {
+    const focusCapability = vi.fn()
+    render(<DirectoryPage group={CREATION} t={zhT} focusCapability={focusCapability} />)
+    fireEvent.click(screen.getByRole('button', { name: '查看 PPT生成 的能力详情' }))
+    expect(focusCapability).toHaveBeenCalledWith('ppt')
+  })
+
+  it('lays a creation capability out the way the prototype does', () => {
+    render(<DirectoryPage group={CREATION} t={zhT} useFocus={focusHook('ppt')} />)
+    // The page replaces the list rather than sitting beside it.
+    expect(screen.queryByRole('searchbox')).toBeNull()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('PPT生成')
+    expect(screen.getByText('先把思路讲清，再做成演示。')).toBeTruthy()
+    expect(screen.getByText('创作中心')).toBeTruthy()
+    // 第一轮追问 reads as a quotation…
+    expect(screen.getByText('这份PPT给谁看？看完后，你最希望对方记住什么或做出什么决定？')).toBeTruthy()
+    // …the three quick tasks as chips…
+    for (const task of ['做一份品牌介绍', '准备经营复盘汇报', '整理招商合作方案。']) {
+      expect(screen.getByText(task)).toBeTruthy()
+    }
+    // …and the remaining rows as prose.
+    expect(screen.getByText('面向谁、页数、视觉风格。')).toBeTruthy()
+    expect(screen.getByText('支持从一句话开始，也可补充文档与品牌资料。')).toBeTruthy()
+  })
+
+  it('says where a creation capability runs, and what starts it', () => {
+    const hooked: BridgeConfig = {
+      baseUrl: 'https://agent.35sz.top',
+      modes: { image: 'platform' },
+      endpoints: {},
+    }
+    render(
+      <DirectoryPage group={CREATION} t={zhT} useFocus={focusHook('image')}
+        useBridges={configHook(hooked)} />,
+    )
+    expect(screen.getByText('能力接入点')).toBeTruthy()
+    expect(screen.getByText('平台接口')).toBeTruthy()
+    expect(screen.getByText('POST')).toBeTruthy()
+    expect(screen.getByText('https://agent.35sz.top/create-image')).toBeTruthy()
+    expect(screen.getByText(/由「设置 → 随星能力接入」配置/)).toBeTruthy()
+
+    // Nothing configured: the address is the socket's reserved default path, and
+    // the page says the platform rung is not in use yet.
+    cleanup()
+    render(<DirectoryPage group={CREATION} t={zhT} useFocus={focusHook('music')} />)
+    expect(screen.getByText('本机完成')).toBeTruthy()
+    expect(screen.getByText('/create-music')).toBeTruthy()
+    expect(screen.getByText(/预留，未启用/)).toBeTruthy()
+  })
+
+  it('walks back to the list and starts work in the conversation', () => {
+    const clearFocus = vi.fn()
+    const openConversation = vi.fn()
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook('legal')}
+        clearFocus={clearFocus} openConversation={openConversation} />,
+    )
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('法务智能体')
+    fireEvent.click(screen.getByRole('button', { name: /返回目录/ }))
+    expect(clearFocus).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: '开始对话' }))
+    expect(openConversation).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows what the architect built: prompt, opening line, starters, assumptions', () => {
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook(LOCAL_AGENT.id)}
+        useCenters={centersHook(snapshot)} />,
+    )
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('面料合规顾问')
+    expect(screen.getByText('本地')).toBeTruthy()
+    expect(screen.getByText('在「设置 → 随星业务中心」用一句话创建，改动会同步到侧栏。')).toBeTruthy()
+    expect(screen.getByText('系统提示词')).toBeTruthy()
+    expect(screen.getByText(LOCAL_AGENT.rolePrompt)).toBeTruthy()
+    expect(screen.getByText('开场白')).toBeTruthy()
+    expect(screen.getByText(LOCAL_AGENT.openingStatement)).toBeTruthy()
+    expect(screen.getByText('引导问题')).toBeTruthy()
+    expect(screen.getByText('这个成分可以标全棉吗？')).toBeTruthy()
+    expect(screen.getByText('参谋官替你做的假设')).toBeTruthy()
+    expect(screen.getByText('默认按 GB/T 29862 读标识')).toBeTruthy()
+  })
+
+  it('shows a locally built workflow as its pipeline', () => {
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [], workflows: [LOCAL_FLOW],
+    }
+    render(
+      <DirectoryPage group={AUTOMATION} t={zhT} useFocus={focusHook(LOCAL_FLOW.id)}
+        useCenters={centersHook(snapshot)} />,
+    )
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('经营周报流水线')
+    expect(screen.getByText('流水线步骤')).toBeTruthy()
+    for (const step of ['汇总数据', '写周报']) expect(screen.getByText(step)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '开始任务' })).toBeTruthy()
+  })
+
+  it('keeps the list when the focused id belongs to another menu', () => {
+    render(<DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook('ppt')} />)
+    expect(screen.getByRole('searchbox')).toBeTruthy()
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(9)
   })
 })

@@ -13,6 +13,7 @@ import { useSyncExternalStore } from 'react'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { createSidebarCatalog } from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -26,6 +27,17 @@ import {
 } from '../src/client/centers/spec.ts'
 import { DIRECTORY_GROUPS, localCapabilities, registerSuiXingDirectory } from '../src/client/directory/index.ts'
 import { directoryEn } from '../src/client/directory/locales.ts'
+
+/** The panel selector the directory navigates with, as ui-layout exposes it. */
+function fakeLayout(): ILayout {
+  return {
+    selectPanel: vi.fn(),
+    beginNavigation: () => new AbortController().signal,
+    toggleSidebar: vi.fn(),
+    openRightbar: vi.fn(),
+    closeRightbar: vi.fn(),
+  }
+}
 
 afterEach(() => {
   cleanup()
@@ -303,6 +315,7 @@ describe('SuiXing business centres — the sidebar projection', () => {
     ctx.provide('locale', new LocaleRuntime(ctx))
     const catalog = createSidebarCatalog(() => {})
     ctx.provide('sidebarCatalog', catalog)
+    ctx.provide('layout', fakeLayout())
     return { ctx, slots, catalog }
   }
 
@@ -310,7 +323,7 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const subject = await bench()
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
-      inject: ['locale', 'slots', 'sidebarCatalog'],
+      inject: ['locale', 'slots', 'sidebarCatalog', 'layout'],
       apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
     })
     await fiber.await()
@@ -347,7 +360,7 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const subject = await bench()
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
-      inject: ['locale', 'slots', 'sidebarCatalog'],
+      inject: ['locale', 'slots', 'sidebarCatalog', 'layout'],
       apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
     })
     await fiber.await()

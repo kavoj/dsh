@@ -152,6 +152,32 @@
   line-height: 16px;
 }
 
+/* The card's way into the capability's own page. It sits in the card head
+   beside the badge, so opening a card is one explicit control rather than a
+   click target the user has to discover. */
+.cardOpen {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.cardOpen:hover {
+  color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-border-l3);
+}
+
+.cardOpen:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
 .cardLead {
   margin: 0;
   font-size: 14px;

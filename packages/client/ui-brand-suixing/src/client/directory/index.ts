@@ -12,8 +12,14 @@
  * rebuilt whenever either moves, which is what makes "draft an agent" and "see
  * it in the menu" one step for the user rather than a sync problem. A shipped
  * group keeps its entries; the local ones append after them.
+ *
+ * Activating an entry is the same navigation as opening a card: it writes the
+ * focused capability and selects the menu's panel. The sidebar therefore lands
+ * on the capability itself, and the panel's list is one step back — the
+ * prototype's behaviour, expressed as data the shell already knows how to run.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { CatalogGroup } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -22,12 +28,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { BridgesService } from '../bridges/store.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { DirectoryPage } from './DirectoryPage.tsx'
+import { createDirectoryFocus, type DirectoryFocus } from './focus.ts'
 import { DIRECTORY_NS, directoryEn, directoryZh, type SuiXingDirectoryKey } from './locales.ts'
 import {
   AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL, DIRECTORY_GROUPS, type DirectoryGroupSpec,
 } from './specs.ts'
 
+export { CapabilityDetail, type CapabilityDetailProps, type DetailConnection, type DetailTarget } from './CapabilityDetail.tsx'
 export { DirectoryPage, type DirectoryPageProps } from './DirectoryPage.tsx'
+export { createDirectoryFocus, type DirectoryFocus } from './focus.ts'
 export { DIRECTORY_NS, directoryEn, directoryZh, type SuiXingDirectoryKey } from './locales.ts'
 export {
   AGENTS_PANEL, AUTOMATION_PANEL, PROJECTS_PANEL, CREATION_PANEL,
@@ -36,7 +45,7 @@ export {
   type CapabilityField, type CapabilitySpec, type DirectoryGroupSpec,
 } from './specs.ts'
 
-/** One capability the user built locally, as an entry and as a page row. */
+/** One capability the user built locally, as an entry and as a list row. */
 export interface LocalCapability {
   /** Local store id, distinct from every shipped entry id. */
   readonly id: string
@@ -77,11 +86,21 @@ export function localCapabilities(
  * @param group - the shipped group descriptor.
  * @param snapshot - the current business-centre configuration.
  * @param t - directory translate seat.
+ * @param openEntry - performs the navigation an activated entry asks for.
  * @returns the group as the sidebar takes it.
  */
 function catalogGroup(
   group: DirectoryGroupSpec, snapshot: CentersSnapshot, t: Translate<SuiXingDirectoryKey>,
+  openEntry: (entryId: string) => void,
 ): CatalogGroup {
+  const entry = (id: string, label: string, hint: string) => ({
+    id,
+    label,
+    hint,
+    // Opening an entry lands on the capability itself: the focused id is what
+    // the menu's panel reads, so one navigation serves the entry and the card.
+    target: { kind: 'command' as const, run: () => { openEntry(id) } },
+  })
   return {
     id: group.id,
     order: group.order,
@@ -93,20 +112,10 @@ function catalogGroup(
     // browser-local, so nothing here is edited from the client.
     manageable: group.manageable,
     entries: [
-      ...group.entries.map(capability => ({
-        id: capability.id,
-        label: t(capability.labelKey),
-        hint: t(capability.hintKey),
-        // Until a capability's working page lands, both the menu row and
-        // "view all" open the directory that carries its definition.
-        target: { kind: 'panel' as const, panelId: group.panelId },
-      })),
-      ...localCapabilities(group, snapshot).map(local => ({
-        id: local.id,
-        label: local.name,
-        hint: local.hint,
-        target: { kind: 'panel' as const, panelId: group.panelId },
-      })),
+      ...group.entries.map(capability =>
+        entry(capability.id, t(capability.labelKey), t(capability.hintKey))),
+      ...localCapabilities(group, snapshot).map(local =>
+        entry(local.id, local.name, local.hint)),
     ],
   }
 }
@@ -116,18 +125,26 @@ const BRIDGED_PANELS = new Set<string>([CREATION_PANEL])
 
 /**
  * Register the directory's dictionaries, groups, and panels.
- * @param ctx - Client root context carrying the catalog, slot, and locale services.
+ * @param ctx - Client root context carrying the catalog, slot, locale, and layout services.
  * @param centers - the business-centre configuration the local entries come from.
  * @param bridges - the capability-connection configuration the pages read.
+ * @returns the focus service, so a caller that already shows a capability can drive it.
  */
 export function registerSuiXingDirectory(
   ctx: ClientContext, centers: CentersService, bridges: BridgesService,
-): void {
+): DirectoryFocus {
   ctx.effect(
     () => ctx.locale.register(DIRECTORY_NS, { zh: directoryZh, en: directoryEn }),
     'ui-brand-suixing: directory dictionaries',
   )
   const t = ctx.locale.bind(DIRECTORY_NS)
+  const focus = createDirectoryFocus()
+  // One navigation, two writers: the sidebar entry and the card both say "show
+  // this capability", and the panel that renders it is the menu's own.
+  const openEntry = (panelId: MainPanelId, entryId: string): void => {
+    focus.focus(entryId)
+    ctx.layout.selectPanel(panelId)
+  }
   // The panels are keyed slots registered once: their content follows the
   // stores through bound hooks instead, so a new agent shows up in "view all"
   // and a new connection shows up on its badge without re-registering a
@@ -140,8 +157,11 @@ export function registerSuiXingDirectory(
       inject: () => ({
         group,
         hooks: BRIDGED_PANELS.has(group.panelId)
-          ? { centers, bridges }
-          : { centers },
+          ? { centers, bridges, focus }
+          : { centers, focus },
+        focusCapability: (id: string) => { focus.focus(id) },
+        clearFocus: () => { focus.clear() },
+        openConversation: () => { ctx.layout.selectPanel(null) },
       }),
     }, DirectoryPage))
   }
@@ -154,7 +174,8 @@ export function registerSuiXingDirectory(
       for (const dispose of disposers) dispose()
       const snapshot = centers.getSnapshot()
       disposers = DIRECTORY_GROUPS.map(group =>
-        ctx.sidebarCatalog.register(catalogGroup(group, snapshot, t)))
+        ctx.sidebarCatalog.register(catalogGroup(group, snapshot, t,
+          (entryId) => { openEntry(group.panelId, entryId) })))
     }
     publish()
     const stop = centers.subscribe(publish)
@@ -163,4 +184,5 @@ export function registerSuiXingDirectory(
       for (const dispose of disposers) dispose()
     }
   }, 'ui-brand-suixing: directory catalogue')
+  return focus
 }

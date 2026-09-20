@@ -9,6 +9,11 @@
  * user's data, it changes while the client runs, and a re-registration per
  * change would be a worse way to say the same thing.
  *
+ * The page has two states, both driven by the focus the sidebar and the cards
+ * write: the list, and one capability in full. Which one is on screen is
+ * navigation state, so it arrives through its own hook rather than through the
+ * group descriptor.
+ *
  * 创作中心 additionally reads the connection store: each of its four
  * capabilities says whether it runs here or on the platform, which is the one
  * fact a user needs before handing work over.
@@ -16,9 +21,10 @@
 import { useMemo, useState } from 'react'
 import type { PropsLocale, Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
-import { bridge, bridgeStatus, type BridgeConfig } from '../bridges/spec.ts'
+import { bridge, bridgeStatus, bridgeUrl, type BridgeConfig } from '../bridges/spec.ts'
 import type { BridgesSnapshot } from '../bridges/store.ts'
 import type { CentersSnapshot } from '../centers/store.ts'
+import { CapabilityDetail, type DetailConnection, type DetailTarget } from './CapabilityDetail.tsx'
 import { DIRECTORY_NS, type SuiXingDirectoryKey } from './locales.ts'
 import {
   AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL,
@@ -29,7 +35,7 @@ import css from './DirectoryPage.module.css'
 /** The namespace-bound translate seat this page reads. */
 type DirectoryTranslate = Translate<SuiXingDirectoryKey>
 
-/** One locally built capability, as the page lists it. */
+/** One locally built capability, as the list renders it. */
 interface LocalRow {
   /** Store id. */
   readonly id: string
@@ -54,6 +60,9 @@ const NO_BRIDGES: BridgeConfig = { baseUrl: '', modes: {}, endpoints: {} }
 /** Selector hook over nothing: the stable fallback for `useBridges`. */
 const noBridges: SnapshotSelectorHook<BridgesSnapshot> = select => select(NO_BRIDGES)
 
+/** Selector hook over nothing: the stable fallback for `useFocus`. */
+const noFocus: SnapshotSelectorHook<string | null> = select => select(null)
+
 /** Composed props the main slot renderer supplies to a directory page. */
 export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   /** The menu this panel is the directory of. */
@@ -62,6 +71,14 @@ export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   readonly useCenters?: SnapshotSelectorHook<CentersSnapshot> | undefined
   /** Connection snapshot hook; absent renders every capability as local. */
   readonly useBridges?: SnapshotSelectorHook<BridgesSnapshot> | undefined
+  /** Focused-capability hook; absent renders the list only. */
+  readonly useFocus?: SnapshotSelectorHook<string | null> | undefined
+  /** Show one capability in full. */
+  readonly focusCapability?: ((id: string) => void) | undefined
+  /** Walk back to the list. */
+  readonly clearFocus?: (() => void) | undefined
+  /** Start work in the conversation. */
+  readonly openConversation?: (() => void) | undefined
 }
 
 /**
@@ -78,7 +95,7 @@ function matches(capability: CapabilitySpec, needle: string, t: DirectoryTransla
 }
 
 /**
- * The locally built capabilities of one menu, in the shape the page renders.
+ * The locally built capabilities of one menu, in the shape the list renders.
  * @param group - the menu being rendered.
  * @param snapshot - the business-centre configuration.
  * @returns the local rows, empty for a menu the local architect does not fill.
@@ -116,17 +133,21 @@ function bridgeBadge(
 }
 
 /**
- * Render one business menu's capability directory.
- * @param props - the group descriptor, the centres hook, and the translate seat.
+ * Render one business menu: its capability list, or the one capability the user
+ * opened from the sidebar or from a card.
+ * @param props - the group descriptor, the injected hooks and actions, and the
+ * translate seat.
  * @returns the directory page.
  */
 export function DirectoryPage({
-  group, useCenters = noCenters, useBridges = noBridges, t,
+  group, useCenters = noCenters, useBridges = noBridges, useFocus = noFocus,
+  focusCapability, clearFocus, openConversation, t,
 }: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
   const snapshot = useCenters(state => state)
   const bridges = useBridges(state => state)
+  const focusedId = useFocus(state => state)
   // Only 创作中心 carries sockets; every other menu keeps the status badge.
   const showsConnections = group.panelId === CREATION_PANEL
   const shipped = useMemo(
@@ -136,6 +157,39 @@ export function DirectoryPage({
   const locals = localRows(group, snapshot)
     .filter(row => needle === '' || row.name.toLowerCase().includes(needle)
       || row.hint.toLowerCase().includes(needle))
+
+  // The focused capability, resolved against both halves of the list: a shipped
+  // id opens its definition, a local id opens the record the architect built.
+  const detail = useMemo((): DetailTarget | null => {
+    if (focusedId === null) return null
+    const capability = group.entries.find(entry => entry.id === focusedId)
+    if (capability !== undefined) return { kind: 'shipped', capability }
+    const agent = snapshot.agents.find(item => item.id === focusedId)
+    if (agent !== undefined) return { kind: 'agent', agent }
+    const workflow = snapshot.workflows.find(item => item.id === focusedId)
+    if (workflow !== undefined) return { kind: 'workflow', workflow }
+    return null
+  }, [focusedId, group, snapshot])
+
+  const connection = useMemo((): DetailConnection | undefined => {
+    if (detail === null || detail.kind !== 'shipped' || !showsConnections) return undefined
+    const spec = bridge(detail.capability.id)
+    if (spec === undefined) return undefined
+    return { spec, status: bridgeStatus(bridges, spec), url: bridgeUrl(bridges, spec) }
+  }, [detail, showsConnections, bridges])
+
+  if (detail !== null) {
+    return (
+      <CapabilityDetail
+        group={group}
+        target={detail}
+        connection={connection}
+        onBack={() => { clearFocus?.() }}
+        onStart={() => { openConversation?.() }}
+        t={t}
+      />
+    )
+  }
 
   return (
     <article className={css.page} aria-label={t(group.titleKey)}>
@@ -167,6 +221,14 @@ export function DirectoryPage({
                 {(showsConnections ? bridgeBadge(capability, bridges, t) : null)
                   ?? t('page.status')}
               </span>
+              <button
+                type="button"
+                className={css.cardOpen}
+                aria-label={t('page.open', { name: t(capability.labelKey) })}
+                onClick={() => { focusCapability?.(capability.id) }}
+              >
+                {t('page.open.label')}
+              </button>
             </div>
             <p className={css.cardLead}>{t(capability.hintKey)}</p>
             <dl className={css.fields}>
@@ -191,6 +253,14 @@ export function DirectoryPage({
                 <div className={css.cardHead}>
                   <h3 className={css.cardName}>{row.name}</h3>
                   <span className={css.badge}>{t('page.local.badge')}</span>
+                  <button
+                    type="button"
+                    className={css.cardOpen}
+                    aria-label={t('page.open', { name: row.name })}
+                    onClick={() => { focusCapability?.(row.id) }}
+                  >
+                    {t('page.open.label')}
+                  </button>
                 </div>
                 <p className={css.cardLead}>{row.hint}</p>
               </li>
