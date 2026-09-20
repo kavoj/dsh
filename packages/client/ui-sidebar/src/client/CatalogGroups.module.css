@@ -1,4 +1,4 @@
-/* Sidebar catalog region: a stack of independently folding groups above the
+/* Sidebar catalog region: a stack of independently folding groups below the
    workspace browser. The shell owns every presentation here; a distribution
    only supplies group data. Nothing selects by business name. */
 

@@ -8,8 +8,9 @@
  * same top-down order) on one fade that ends with the slide. The bottom-pinned
  * settings control only fades. The workspace/session browsing region between
  * global panel rows and the foot is the `sidebar.workspaces` registrant's,
- * and the foot holds `sidebar.settings` plus `sidebar.footer.action`; the shell
- * hands them the wide flag (plus an expand request callback for the browser).
+ * the business catalog stacks below it, and the foot holds `sidebar.settings`
+ * plus `sidebar.footer.action`; the shell hands them the wide flag (plus an
+ * expand request callback for the browser).
  *
  * The column also owns whether the scroll regions nested in it draw a
  * scrollbar at all: the shell tracks the pointer and rebinds ui-theme's
@@ -270,9 +271,21 @@ export function SidebarRoot({
         </nav>
       )}
 
-      {/* Business catalog groups: the shell renders whatever a distribution
-          published through ctx.sidebarCatalog, and renders nothing at all —
-          no wrapper element either — when none did. */}
+      {/* The browsing region fills the column between the controls and the
+          foot in both states; its rail icon column rides the same slot. */}
+      <div className={css.regionArea}>
+        {renderSlot('sidebar.workspaces', {
+          wide,
+          expandSidebar: () => { if (collapsed) toggleSidebar() },
+        })}
+      </div>
+
+      {/* Business catalog groups: seated BELOW the workspace browser, so a
+          distribution's own centres (AI staff, automation, projects) read as
+          peers of the workspace list rather than as replacements for the
+          global panel rows above it. The shell renders whatever a
+          distribution published through ctx.sidebarCatalog, and renders
+          nothing at all — no wrapper element either — when none did. */}
       {wide && catalogSnapshot.claimed && (
         <div className={css.catalogArea}>
           <CatalogRegion
@@ -285,15 +298,6 @@ export function SidebarRoot({
           />
         </div>
       )}
-
-      {/* The browsing region fills the column between the controls and the
-          foot in both states; its rail icon column rides the same slot. */}
-      <div className={css.regionArea}>
-        {renderSlot('sidebar.workspaces', {
-          wide,
-          expandSidebar: () => { if (collapsed) toggleSidebar() },
-        })}
-      </div>
 
       {/* Footer actions stack above Settings in both sidebar widths. */}
       <div className={css.footArea}>

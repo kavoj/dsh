@@ -496,11 +496,15 @@
   color: var(--dsw-alias-label-primary);
 }
 
-/* Catalog seat: a bounded, self-scrolling stack between the global panel rows
-   and the workspace browser. It is absent from the DOM entirely until a
-   distribution publishes a group, so the default sidebar keeps its layout. */
+/* Catalog seat: a bounded, self-scrolling stack BELOW the workspace browser,
+   so a distribution's business centres sit under the workspace list the user
+   already knows, not above it (the global panel rows stay directly under New
+   Session). `flex: none` keeps the stack whole: the browser above it owns the
+   slack, so a long catalogue scrolls instead of squeezing the list. The seat
+   is absent from the DOM entirely until a distribution publishes a group, so
+   the default sidebar keeps its layout. */
 .catalogArea {
-  flex: 0 1 auto;
+  flex: none;
   min-height: 0;
   max-height: 55%;
   overflow-y: auto;
