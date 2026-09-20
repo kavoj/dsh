@@ -27,6 +27,7 @@ import {
 } from '../src/client/centers/spec.ts'
 import { DIRECTORY_GROUPS, localCapabilities, registerSuiXingDirectory } from '../src/client/directory/index.ts'
 import { directoryEn } from '../src/client/directory/locales.ts'
+import { createThreadsService } from '../src/client/threads/store.ts'
 
 /** The panel selector the directory navigates with, as ui-layout exposes it. */
 function fakeLayout(): ILayout {
@@ -324,7 +325,9 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
       inject: ['locale', 'slots', 'sidebarCatalog', 'layout'],
-      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
+      apply: (ctx: Context) => {
+        registerSuiXingDirectory(ctx, centers, createBridgesService(), createThreadsService())
+      },
     })
     await fiber.await()
 
@@ -361,7 +364,9 @@ describe('SuiXing business centres — the sidebar projection', () => {
     const centers = createCentersService()
     const fiber = subject.ctx.plugin({
       inject: ['locale', 'slots', 'sidebarCatalog', 'layout'],
-      apply: (ctx: Context) => { registerSuiXingDirectory(ctx, centers, createBridgesService()) },
+      apply: (ctx: Context) => {
+        registerSuiXingDirectory(ctx, centers, createBridgesService(), createThreadsService())
+      },
     })
     await fiber.await()
     const [staffGroup, automationGroup] = DIRECTORY_GROUPS

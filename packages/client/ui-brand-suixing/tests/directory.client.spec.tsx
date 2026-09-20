@@ -434,18 +434,21 @@ describe('SuiXing capability directory — one capability in full', () => {
     expect(screen.getByText(/预留，未启用/)).toBeTruthy()
   })
 
-  it('walks back to the list and starts work in the conversation', () => {
+  it('walks back to the list and starts work for the focused capability', () => {
     const clearFocus = vi.fn()
-    const openConversation = vi.fn()
+    const startCapability = vi.fn()
     render(
       <DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook('legal')}
-        clearFocus={clearFocus} openConversation={openConversation} />,
+        clearFocus={clearFocus} startCapability={startCapability} />,
     )
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('法务智能体')
     fireEvent.click(screen.getByRole('button', { name: /返回目录/ }))
     expect(clearFocus).toHaveBeenCalledTimes(1)
     fireEvent.click(screen.getByRole('button', { name: '开始对话' }))
-    expect(openConversation).toHaveBeenCalledTimes(1)
+    // The page hands over the capability it is showing; the registration decides
+    // whether that becomes a real conversation or just a panel switch.
+    expect(startCapability).toHaveBeenCalledTimes(1)
+    expect(startCapability).toHaveBeenCalledWith('legal')
   })
 
   it('shows what the architect built: prompt, opening line, starters, assumptions', () => {

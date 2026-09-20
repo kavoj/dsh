@@ -10,6 +10,11 @@
  * and the panel rows all keep running exactly as they did without this
  * package, which is also why unloading the distribution restores that sidebar
  * byte for byte.
+ *
+ * The two things it does create are both the base client's own entities: a
+ * conversation started from a capability is an ordinary Session (see
+ * `threads/`), and a capability named in a chat is an ordinary `@` reference
+ * (see `references/`).
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
@@ -28,6 +33,7 @@ import { createCentersService } from './centers/store.ts'
 import { registerSuiXingDirectory } from './directory/index.ts'
 import type { SuiXingDirectoryKey } from './directory/locales.ts'
 import { en, NS, zh, type SuiXingBrandKey } from './locales.ts'
+import { createThreadsService, type ThreadsService } from './threads/store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -48,6 +54,10 @@ export type { BridgeCentre, BridgeMode, BridgeSpec, BridgeStatus } from './bridg
 export type { BridgesService, BridgesSnapshot } from './bridges/store.ts'
 export type { CentersSectionInjected, CentersSectionProps } from './centers/CentersSection.tsx'
 export type { CenterSource, CentersService, CentersSnapshot, CentersState } from './centers/store.ts'
+export type { CapabilityRow, LocalCapability } from './directory/capabilities.ts'
+export type { ThreadLauncher } from './threads/launcher.ts'
+export type { ThreadRecord, ThreadRow, ThreadSummary } from './threads/spec.ts'
+export type { ThreadsService, ThreadsSnapshot } from './threads/store.ts'
 export {
   BRIDGES, DEFAULT_PLATFORM_BASE, bridge, bridgeStatus, bridgeUrl, platformCount,
   EMPTY_BRIDGE_CONFIG, type BridgeConfig,
@@ -57,6 +67,14 @@ export {
   type AgentDraft, type AgentSpec, type ClarifyAnswers, type ClarifySlot,
   type OutputKind, type WorkflowDraft, type WorkflowSpec,
 } from './centers/spec.ts'
+export { capabilityRows, localCapabilities } from './directory/capabilities.ts'
+export { THREAD_VISIBLE_LIMIT, liveThreads, threadRows } from './threads/spec.ts'
+export { THREADS_PERSIST_NAME, createThreadsService } from './threads/store.ts'
+export {
+  REFERENCE_LIMIT, REF_PREFIX, clipboardTextOf, matchReferences, parseReference, referenceOf,
+  serializeReference, serializeUnresolved, toReference,
+  type CapabilityReference,
+} from './references/spec.ts'
 
 /** Required services: the UI slot registry, the locale registry, the sidebar's
  * catalogue, and the panel selector an activated entry navigates with. */
@@ -76,13 +94,15 @@ const BRIDGES_SECTION_ORDER = 31
  */
 export function apply(ctx: ClientContext): void {
   if (process.env.DSH_CLIENT_BUILD_PROFILE !== 'suixing') return
-  // Two services behind the two settings surfaces: the centres answer "which
-  // capabilities exist", the connections answer "who runs this capability".
-  // Both are read by the directory, so a change in Settings is a change in the
-  // menu without a second step.
+  // Three services behind the three surfaces: the centres answer "which
+  // capabilities exist", the connections answer "who runs this capability", and
+  // the threads answer "which conversations did it start". All three are read
+  // by the directory, so a change in Settings or a started conversation is a
+  // change in the menu without a second step.
   const centers = createCentersService()
   const bridges = createBridgesService()
-  registerSuiXingDirectory(ctx, centers, bridges)
+  const threads: ThreadsService = createThreadsService()
+  registerSuiXingDirectory(ctx, centers, bridges, threads)
   ctx.effect(
     () => ctx.locale.register(CENTERS_NS, { zh: centersZh, en: centersEn }),
     'ui-brand-suixing: centres dictionaries',

@@ -25,25 +25,13 @@ import { bridge, bridgeStatus, bridgeUrl, type BridgeConfig } from '../bridges/s
 import type { BridgesSnapshot } from '../bridges/store.ts'
 import type { CentersSnapshot } from '../centers/store.ts'
 import { CapabilityDetail, type DetailConnection, type DetailTarget } from './CapabilityDetail.tsx'
+import { localCapabilities } from './capabilities.ts'
 import { DIRECTORY_NS, type SuiXingDirectoryKey } from './locales.ts'
-import {
-  AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL,
-  type CapabilitySpec, type DirectoryGroupSpec,
-} from './specs.ts'
+import { CREATION_PANEL, type CapabilitySpec, type DirectoryGroupSpec } from './specs.ts'
 import css from './DirectoryPage.module.css'
 
 /** The namespace-bound translate seat this page reads. */
 type DirectoryTranslate = Translate<SuiXingDirectoryKey>
-
-/** One locally built capability, as the list renders it. */
-interface LocalRow {
-  /** Store id. */
-  readonly id: string
-  /** Name the user kept. */
-  readonly name: string
-  /** One-line promise, or a workflow's step chain. */
-  readonly hint: string
-}
 
 /** The configuration a page renders when it is composed without the centres
  * service (unit tests, and any composition that ships no settings page). */
@@ -77,8 +65,8 @@ export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   readonly focusCapability?: ((id: string) => void) | undefined
   /** Walk back to the list. */
   readonly clearFocus?: (() => void) | undefined
-  /** Start work in the conversation. */
-  readonly openConversation?: (() => void) | undefined
+  /** Start work for one capability: a conversation of its own. */
+  readonly startCapability?: ((id: string) => void) | undefined
 }
 
 /**
@@ -92,26 +80,6 @@ function matches(capability: CapabilitySpec, needle: string, t: DirectoryTransla
   if (needle === '') return true
   return t(capability.labelKey).toLowerCase().includes(needle)
     || t(capability.hintKey).toLowerCase().includes(needle)
-}
-
-/**
- * The locally built capabilities of one menu, in the shape the list renders.
- * @param group - the menu being rendered.
- * @param snapshot - the business-centre configuration.
- * @returns the local rows, empty for a menu the local architect does not fill.
- */
-function localRows(group: DirectoryGroupSpec, snapshot: CentersSnapshot): readonly LocalRow[] {
-  if (group.panelId === AGENTS_PANEL) {
-    return snapshot.agents.map(agent => ({ id: agent.id, name: agent.name, hint: agent.oneLiner }))
-  }
-  if (group.panelId === AUTOMATION_PANEL) {
-    return snapshot.workflows.map(flow => ({
-      id: flow.id,
-      name: flow.name,
-      hint: flow.steps.map(step => step.name).join(' → '),
-    }))
-  }
-  return []
 }
 
 /**
@@ -141,7 +109,7 @@ function bridgeBadge(
  */
 export function DirectoryPage({
   group, useCenters = noCenters, useBridges = noBridges, useFocus = noFocus,
-  focusCapability, clearFocus, openConversation, t,
+  focusCapability, clearFocus, startCapability, t,
 }: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
@@ -154,7 +122,7 @@ export function DirectoryPage({
     () => group.entries.filter(capability => matches(capability, needle, t)),
     [group.entries, needle, t],
   )
-  const locals = localRows(group, snapshot)
+  const locals = localCapabilities(group, snapshot)
     .filter(row => needle === '' || row.name.toLowerCase().includes(needle)
       || row.hint.toLowerCase().includes(needle))
 
@@ -185,7 +153,7 @@ export function DirectoryPage({
         target={detail}
         connection={connection}
         onBack={() => { clearFocus?.() }}
-        onStart={() => { openConversation?.() }}
+        onStart={() => { if (focusedId !== null) startCapability?.(focusedId) }}
         t={t}
       />
     )

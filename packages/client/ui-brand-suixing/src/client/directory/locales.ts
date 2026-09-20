@@ -70,7 +70,8 @@ export const directoryZh = {
   'detail.start.creation': '开始创作',
   'detail.start.workflow': '开始任务',
   'detail.start.project': '打开项目中心',
-  'detail.start.hint': '当前在随星会话中进行；接入平台后改由平台执行。',
+  'detail.start.hint': '开始后新建一个对话，挂在左侧该能力下方；任意对话里也可用 @ 引用它。',
+  'entry.thread.blank': '新的对话',
 
   // AI参谋部: nine agents.
   'entry.chief': '总裁决策官',
@@ -241,7 +242,8 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'detail.start.creation': 'Start creating',
   'detail.start.workflow': 'Start task',
   'detail.start.project': 'Open project hub',
-  'detail.start.hint': 'Runs in a SuiXing conversation today; the platform runs it once connected.',
+  'detail.start.hint': 'Starting one opens a new conversation, nested under this capability in the sidebar; any chat can reference it with @ too.',
+  'entry.thread.blank': 'New conversation',
 
   'entry.chief': 'Chief Decision Officer',
   'entry.chief.hint': 'Turn the problem in front of you into a next step.',
