@@ -207,3 +207,103 @@
   outline: 2px solid var(--dsw-alias-label-primary);
   outline-offset: -2px;
 }
+
+/* Manage surface on a manageable group's header: the row menu appears on
+   hover or keyboard focus, the way the workspace rows already do, so the
+   resting stack stays as quiet as a read-only catalogue. */
+.rowActions {
+  flex: none;
+  display: none;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.groupRow:hover .rowActions,
+.groupRow:focus-within .rowActions {
+  display: flex;
+}
+
+.rowAction {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.rowAction:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.rowAction:focus-visible {
+  outline: 2px solid var(--dsw-alias-label-primary);
+  outline-offset: -2px;
+}
+
+/* "New group" seat under the stack: the sidebar's own add row, matching the
+   workspace section's add action in weight and geometry. */
+.addGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  margin-top: 2px;
+  padding: 4px 8px;
+  box-sizing: border-box;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.addGroup:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.addGroup:focus-visible {
+  outline: 2px solid var(--dsw-alias-label-primary);
+  outline-offset: -2px;
+}
+
+/* Dialogs: the same pill field and error line the workspace rename/delete
+   dialogs use, so managing a group reads as the same act as managing a
+   workspace. */
+.nameInput {
+  box-sizing: border-box;
+  width: 100%;
+  height: 44px;
+  padding: 7px 14px;
+  border: 0.5px solid var(--dsw-alias-border-l4);
+  border-radius: 22px;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.dialogError {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.deleteAction:not(:disabled) {
+  color: var(--dsw-alias-state-error-primary);
+}

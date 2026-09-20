@@ -33,7 +33,7 @@ describe('sidebar catalog registry', () => {
   it('starts unclaimed: no distribution publishes, so the shell renders nothing', () => {
     const catalog = createSidebarCatalog(vi.fn())
     expect(catalog.getSnapshot()).toEqual({
-      claimed: false, status: 'ready', groups: [], canRetry: false,
+      claimed: false, status: 'ready', groups: [], canRetry: false, canManage: false,
     })
     catalog.dispose()
   })
@@ -211,5 +211,63 @@ describe('sidebar catalog registry', () => {
     catalog.dispose()
     catalog.reportStatus('error')
     expect(survivor).not.toHaveBeenCalled()
+  })
+
+  it('renames a registrant group locally and hides it on remove', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', [], { manageable: true }))
+    catalog.register(group('b', []))
+    // A rename is a browser-local override: the registration keeps its data.
+    catalog.renameGroup('a', 'My centre')
+    expect(catalog.getSnapshot().groups.map(view => view.group.title)).toEqual(['My centre', 'Group b'])
+    // A remove takes a registrant's group out of this browser's sidebar.
+    catalog.removeGroup('b')
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['a'])
+    // Renaming and removing an unknown id is a no-op, not an error.
+    catalog.renameGroup('ghost', 'nothing')
+    catalog.removeGroup('ghost')
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['a'])
+    catalog.dispose()
+  })
+
+  it('adds a user group below every registered seat, renames it in place, and drops it', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', [], { order: 10 }))
+    const id = catalog.createGroup('我的业务中心')
+    expect(id).toBe('user.1')
+    const created = catalog.getSnapshot().groups.at(-1)
+    expect(created?.group).toMatchObject({ id: 'user.1', title: '我的业务中心', entries: [] })
+    expect(created?.group.manageable).toBe(true)
+    expect(created?.total).toBe(0)
+    // A user group owns its title: renaming rewrites the record, and the id it
+    // holds is never handed out twice while it is live.
+    catalog.renameGroup('user.1', '数据标注')
+    expect(catalog.getSnapshot().groups.at(-1)?.group.title).toBe('数据标注')
+    expect(catalog.createGroup('第二组')).toBe('user.2')
+    catalog.removeGroup('user.1')
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['a', 'user.2'])
+    catalog.dispose()
+  })
+
+  it('offers the manage surface only while a manageable group is on screen', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    expect(catalog.getSnapshot().canManage).toBe(false)
+    catalog.register(group('fixed', []))
+    expect(catalog.getSnapshot().canManage).toBe(false)
+    const drop = catalog.register(group('manageable', [], { manageable: true }))
+    expect(catalog.getSnapshot().canManage).toBe(true)
+    drop()
+    expect(catalog.getSnapshot().canManage).toBe(false)
+    catalog.dispose()
+  })
+
+  it('unfolds the first group on screen, not a removed one', () => {
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', [], { order: 1, manageable: true }))
+    catalog.register(group('b', [], { order: 2 }))
+    // First run opens one center; hiding it must open the next, not nothing.
+    catalog.removeGroup('a')
+    expect(catalog.getSnapshot().groups.map(view => view.group.id)).toEqual(['b'])
+    catalog.dispose()
   })
 })

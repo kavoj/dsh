@@ -6,7 +6,7 @@
  * the registrant's.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { CatalogRegion, type CatalogRegionProps } from '../src/client/CatalogGroups.tsx'
 import { CATALOG_VISIBLE_LIMIT, type CatalogGroupView, type CatalogSnapshot } from '../src/client/catalog.ts'
@@ -52,8 +52,11 @@ function mount(snapshot: Partial<CatalogSnapshot>) {
   const onActivate = vi.fn()
   const onSelectPanel = vi.fn()
   const onRetry = vi.fn()
+  const onRenameGroup = vi.fn()
+  const onRemoveGroup = vi.fn()
+  const onCreateGroup = vi.fn()
   const full: CatalogSnapshot = {
-    claimed: true, status: 'ready', groups: [], canRetry: false, ...snapshot,
+    claimed: true, status: 'ready', groups: [], canRetry: false, canManage: false, ...snapshot,
   }
   const rendered = render(
     <CatalogRegion
@@ -62,10 +65,16 @@ function mount(snapshot: Partial<CatalogSnapshot>) {
       onActivate={onActivate}
       onSelectPanel={onSelectPanel}
       onRetry={onRetry}
+      onRenameGroup={onRenameGroup}
+      onRemoveGroup={onRemoveGroup}
+      onCreateGroup={onCreateGroup}
       t={t}
     />,
   )
-  return { rendered, onToggleGroup, onActivate, onSelectPanel, onRetry }
+  return {
+    rendered, onToggleGroup, onActivate, onSelectPanel, onRetry,
+    onRenameGroup, onRemoveGroup, onCreateGroup,
+  }
 }
 
 describe('catalog region states', () => {
@@ -220,6 +229,94 @@ describe('catalog region search', () => {
     expect(screen.getByText('Entry one')).toBeTruthy()
     expect(screen.getByText('Rare phrase')).toBeTruthy()
     expect(screen.queryByText('Entry two')).toBeNull()
+    b.rendered.unmount()
+  })
+})
+
+describe('catalog manage surface', () => {
+  /** One manageable group: the shape SuiXing's three centres publish. */
+  const MANAGEABLE = { id: 'a', title: 'Alpha center', entries: ENTRIES, manageable: true }
+  const actions = t('catalog.actions', { name: 'Alpha center' })
+
+  /** Read a text field's current value without the jest-dom matchers. */
+  const valueOf = (element: HTMLElement): string => (element as HTMLInputElement).value
+
+  it('leaves a fixed catalogue read-only', () => {
+    const b = mount({ groups: [view({})] })
+    expect(screen.queryByRole('button', { name: en['catalog.create'] })).toBeNull()
+    expect(screen.queryByRole('button', { name: actions })).toBeNull()
+    b.rendered.unmount()
+  })
+
+  it('renames a manageable group through its header menu', () => {
+    const b = mount({ groups: [view({ group: MANAGEABLE })], canManage: true })
+    fireEvent.click(screen.getByRole('button', { name: actions }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['catalog.rename'] }))
+    const dialog = screen.getByRole('dialog')
+    const field = within(dialog).getByRole('textbox', { name: en['catalog.field.groupName'] })
+    expect(valueOf(field)).toBe('Alpha center')
+    fireEvent.change(field, { target: { value: 'Beta center' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: en['catalog.rename'] }))
+    expect(b.onRenameGroup).toHaveBeenCalledExactlyOnceWith('a', 'Beta center')
+    b.rendered.unmount()
+  })
+
+  it('blocks a rename that collides with another group on screen', () => {
+    const b = mount({
+      groups: [
+        view({ group: MANAGEABLE }),
+        view({ group: { id: 'b', title: 'Beta center', entries: ENTRIES, manageable: true } }),
+      ],
+      canManage: true,
+    })
+    fireEvent.click(screen.getByRole('button', { name: actions }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['catalog.rename'] }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.change(
+      within(dialog).getByRole('textbox', { name: en['catalog.field.groupName'] }),
+      { target: { value: 'Beta center' } },
+    )
+    expect(within(dialog).getByText(t('catalog.conflict.named', { name: 'Beta center' }))).toBeTruthy()
+    const confirm = within(dialog).getByRole('button', { name: en['catalog.rename'] })
+    expect((confirm as HTMLButtonElement).disabled).toBe(true)
+    b.rendered.unmount()
+  })
+
+  it('confirms before removing a manageable group', () => {
+    const b = mount({ groups: [view({ group: MANAGEABLE })], canManage: true })
+    fireEvent.click(screen.getByRole('button', { name: actions }))
+    fireEvent.click(screen.getByRole('menuitem', { name: en['catalog.delete'] }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(t('catalog.delete.desc', { name: 'Alpha center' }))).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: en['catalog.delete'] }))
+    expect(b.onRemoveGroup).toHaveBeenCalledExactlyOnceWith('a')
+    b.rendered.unmount()
+  })
+
+  it('creates a group from the stack seat, blocking a duplicate name', () => {
+    const b = mount({ groups: [view({ group: MANAGEABLE })], canManage: true })
+    fireEvent.click(screen.getByRole('button', { name: en['catalog.create'] }))
+    const dialog = screen.getByRole('dialog')
+    const field = within(dialog).getByRole('textbox', { name: en['catalog.field.groupName'] })
+    fireEvent.change(field, { target: { value: 'Alpha center' } })
+    const blocked = within(dialog).getByRole('button', { name: en['catalog.create'] })
+    expect((blocked as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.change(field, { target: { value: '我的业务中心' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: en['catalog.create'] }))
+    expect(b.onCreateGroup).toHaveBeenCalledExactlyOnceWith('我的业务中心')
+    b.rendered.unmount()
+  })
+
+  it('reads an entry-less group as empty instead of offering a dead search', () => {
+    const b = mount({
+      groups: [view({
+        group: { id: 'user.1', title: '我的业务中心', entries: [], manageable: true },
+        visible: [], total: 0,
+      })],
+      canManage: true,
+    })
+    expect(screen.getByText(en['catalog.group.empty'])).toBeTruthy()
+    expect(screen.queryByRole('searchbox')).toBeNull()
     b.rendered.unmount()
   })
 })

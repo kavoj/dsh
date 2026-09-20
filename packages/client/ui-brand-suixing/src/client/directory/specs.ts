@@ -41,6 +41,15 @@ export interface DirectoryGroupSpec {
   readonly hintKey: SuiXingDirectoryKey
   /** Main panel this group's "view all" opens. */
   readonly panelId: MainPanelId
+  /**
+   * Whether the sidebar may rename, remove, and add around this group. All
+   * three SuiXing centres are manageable: the plan treats them as the user's
+   * own business areas, and the sidebar's manage surface keeps those choices
+   * browser-local, so nothing here is ever edited from the client. Required
+   * rather than optional, so a centre added later states the decision instead
+   * of inheriting one.
+   */
+  readonly manageable: boolean
   /** Declared capabilities, in prototype order. */
   readonly entries: readonly CapabilitySpec[]
 }
@@ -183,6 +192,7 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     titleKey: 'group.agents',
     hintKey: 'group.agents.hint',
     panelId: AGENTS_PANEL,
+    manageable: true,
     // Plan §2: the Agent center hosts the nine agents and the four creation
     // tools. They share one ordered list so the menu stays a single surface.
     entries: [...AGENT_IDS.map(agent), ...CREATION_IDS.map(creation)],
@@ -193,6 +203,7 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     titleKey: 'group.automation',
     hintKey: 'group.automation.hint',
     panelId: AUTOMATION_PANEL,
+    manageable: true,
     entries: WORKFLOW_IDS.map(workflow),
   },
   {
@@ -201,6 +212,7 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     titleKey: 'group.projects',
     hintKey: 'group.projects.hint',
     panelId: PROJECTS_PANEL,
+    manageable: true,
     // Prototype §5: 项目管理 is parallel to the two business centers. The
     // concrete project model (per-project isolation, unsent drafts) comes with
     // the platform project/workspace API; one planning entry ships first.

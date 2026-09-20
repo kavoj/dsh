@@ -294,6 +294,9 @@ export function SidebarRoot({
             onActivate={(entry) => { catalog.activate(entry) }}
             onSelectPanel={(panelId) => { selectPanel(panelId) }}
             onRetry={() => { catalog.retry() }}
+            onRenameGroup={(groupId, title) => { catalog.renameGroup(groupId, title) }}
+            onRemoveGroup={(groupId) => { catalog.removeGroup(groupId) }}
+            onCreateGroup={(title) => { catalog.createGroup(title) }}
             t={t}
           />
         </div>

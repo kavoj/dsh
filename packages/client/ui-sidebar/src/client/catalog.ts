@@ -6,6 +6,13 @@
  * configuration, or service data. The base layout hardcodes no business name
  * and no entry, so a distribution composes its own catalog without editing the
  * sidebar. Recency and fold state are the shell's, persisted per browser.
+ *
+ * A registrant may mark a group `manageable`: the shell then offers rename and
+ * delete on its header, seats a "new group" action under the stack, and folds
+ * those titles into the conflict set. That is the same manage surface the
+ * workspace browser already gives its projects — one browser-local view
+ * preference, never an edit of the registrant's configuration, so unloading
+ * the distribution leaves its own data untouched.
  */
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
@@ -16,6 +23,12 @@ export const CATALOG_VISIBLE_LIMIT = 5
 
 /** Entry ids remembered across groups, most recent first. */
 const RECENT_CAPACITY = 32
+
+/** Id prefix of a group the user added from the sidebar. */
+const USER_GROUP_PREFIX = 'user.'
+
+/** Order of user-added groups: after every order a registrant declares. */
+const USER_GROUP_ORDER = 1000
 
 /** What activating one entry does. */
 export type CatalogEntryTarget =
@@ -48,6 +61,12 @@ export interface CatalogGroup {
   readonly entries: readonly CatalogEntry[]
   /** Main panel listing the group's full directory; enables "view all". */
   readonly allPanel?: MainPanelId
+  /**
+   * Whether the sidebar manages this group: header rename/delete, a seat in
+   * the title-conflict set, and inclusion in the "new group" surface. Absent
+   * means the group is fixed — only its registrant can change it.
+   */
+  readonly manageable?: boolean
 }
 
 /**
@@ -84,6 +103,12 @@ export interface CatalogSnapshot {
   readonly groups: readonly CatalogGroupView[]
   /** Whether a retry action is available for the current state. */
   readonly canRetry: boolean
+  /**
+   * Whether any rendered group is manageable. The shell shows its "new group"
+   * action only then, so a distribution that ships a fixed catalogue gets the
+   * read-only region it always had.
+   */
+  readonly canManage: boolean
 }
 
 /** The registrant-facing catalog service (ctx.sidebarCatalog). */
@@ -116,22 +141,58 @@ export interface ISidebarCatalog extends ObservableSnapshot<CatalogSnapshot> {
    * @param entry - the activated entry.
    */
   activate(entry: CatalogEntry): void
+  /**
+   * Rename a manageable group for this browser. A group the user added keeps
+   * the new name as its own; a registrant's group keeps its published data and
+   * gains a local title override.
+   * @param groupId - group id.
+   * @param title - the title the user chose.
+   */
+  renameGroup(groupId: string, title: string): void
+  /**
+   * Remove a group from this browser's sidebar. A group the user added is
+   * dropped; a registrant's group is hidden, because its data is not the
+   * sidebar's to delete.
+   * @param groupId - group id.
+   */
+  removeGroup(groupId: string): void
+  /**
+   * Add a user group at the bottom of the stack. It starts empty: a platform
+   * catalogue fills it once one can be addressed.
+   * @param title - the name the user chose.
+   * @returns the generated group id.
+   */
+  createGroup(title: string): string
   /** Re-run the registrant's retry action, when one is installed. */
   retry(): void
   /** Release every subscription this service installed. */
   dispose(): void
 }
 
+/** A group the user added from the sidebar, before any catalogue fills it. */
+interface CatalogCustomGroup {
+  /** Shell-assigned id; stable across reloads. */
+  readonly id: string
+  /** The name the user gave it. */
+  readonly title: string
+}
+
 /**
- * Fold state and recency: the slice the shell persists per browser. The fields
- * are mutable because the snapshot store's `update` hands its draft back as
- * this same type.
+ * Fold state, recency, and the user's own grouping: the slice the shell
+ * persists per browser. The fields are mutable because the snapshot store's
+ * `update` hands its draft back as this same type.
  */
 interface CatalogProgress {
   /** Unfolded group ids; null means the user has not chosen yet. */
   expanded: readonly string[] | null
   /** Visited entry ids, most recent first. */
   recent: readonly string[]
+  /** Registrant group id → the title this browser shows instead. */
+  renamed: Record<string, string>
+  /** Registrant group ids this browser hides. */
+  removed: readonly string[]
+  /** Groups the user added, in creation order. */
+  created: readonly CatalogCustomGroup[]
 }
 
 /** A registration plus its arrival sequence, for stable ordering. */
@@ -151,7 +212,7 @@ export function createSidebarCatalog(
   const registrations = new Map<string, CatalogRegistration>()
   const order = createSnapshotStore<readonly CatalogRegistration[]>([])
   const progress = createSnapshotStore<CatalogProgress>(
-    { expanded: null, recent: [] },
+    { expanded: null, recent: [], renamed: {}, removed: [], created: [] },
     { persist: { name: 'dsh.sidebar.catalog' } },
   )
   /** Status and retry live off the persisted slice: a callback cannot serialize. */
@@ -162,13 +223,15 @@ export function createSidebarCatalog(
 
   // A registered group or a reported status is what puts the region on screen.
   // Both are released with the registrant, so unloading the distribution that
-  // published a catalogue returns the sidebar to its unclaimed DOM.
+  // published a catalogue returns the sidebar to its unclaimed DOM. User-added
+  // groups ride their registrant the same way: with no publisher there is no
+  // region for them to live in, and their records wait for the next load.
   const isClaimed = (): boolean => statusClaimed || registrations.size > 0
 
   const listeners = new Set<() => void>()
-  let cached: CatalogSnapshot = { claimed: false, status, groups: [], canRetry: false }
-
-  const sorted = (): readonly CatalogRegistration[] => order.getSnapshot()
+  let cached: CatalogSnapshot = {
+    claimed: false, status, groups: [], canRetry: false, canManage: false,
+  }
 
   /** Republish the roster in `order` sequence, keeping ties in arrival order. */
   const publish = (): void => {
@@ -177,16 +240,40 @@ export function createSidebarCatalog(
         || left.sequence - right.sequence))
   }
 
+  /**
+   * The groups this browser shows: every live registration the user has not
+   * removed, titled by their rename when one exists, then the groups they
+   * added themselves.
+   */
+  const visibleGroups = (): readonly CatalogGroup[] => {
+    const { renamed, removed, created } = progress.getSnapshot()
+    const published = order.getSnapshot()
+      .filter(registration => !removed.includes(registration.group.id))
+      .map((registration) => {
+        const override = renamed[registration.group.id]
+        return override === undefined ? registration.group : { ...registration.group, title: override }
+      })
+    return [
+      ...published,
+      ...created.map(custom => ({
+        id: custom.id,
+        order: USER_GROUP_ORDER,
+        title: custom.title,
+        entries: [],
+        manageable: true,
+      })),
+    ]
+  }
+
   const expandedIds = (): readonly string[] => {
     const { expanded } = progress.getSnapshot()
     if (expanded !== null) return expanded
     // First run: one center open, so the region is never a wall of headers.
-    const first = sorted()[0]
-    return first === undefined ? [] : [first.group.id]
+    const first = visibleGroups()[0]
+    return first === undefined ? [] : [first.id]
   }
 
-  const view = (registration: CatalogRegistration, unfolded: readonly string[]): CatalogGroupView => {
-    const { group } = registration
+  const view = (group: CatalogGroup, unfolded: readonly string[]): CatalogGroupView => {
     const entries = new Map(group.entries.map(entry => [entry.id, entry]))
     const recent = progress.getSnapshot().recent
       .flatMap(id => entries.get(id) ?? [])
@@ -203,11 +290,13 @@ export function createSidebarCatalog(
 
   const refresh = (): void => {
     const unfolded = expandedIds()
+    const groups = visibleGroups()
     cached = {
       claimed: isClaimed(),
       status,
-      groups: sorted().map(registration => view(registration, unfolded)),
+      groups: groups.map(group => view(group, unfolded)),
       canRetry: retryAction !== undefined,
+      canManage: groups.some(group => group.manageable === true),
     }
     for (const listener of [...listeners]) listener()
   }
@@ -216,6 +305,17 @@ export function createSidebarCatalog(
     order.subscribe(refresh),
     progress.subscribe(refresh),
   ]
+
+  /** First free user-group id, so a removed one never shadows a live group. */
+  const nextUserGroupId = (): string => {
+    const taken = new Set([
+      ...registrations.keys(),
+      ...progress.getSnapshot().created.map(custom => custom.id),
+    ])
+    let index = 1
+    while (taken.has(`${USER_GROUP_PREFIX}${index}`)) index += 1
+    return `${USER_GROUP_PREFIX}${index}`
+  }
 
   const service: ISidebarCatalog = {
     getSnapshot: () => cached,
@@ -260,6 +360,37 @@ export function createSidebarCatalog(
       })
       if (entry.target.kind === 'panel') selectPanel(entry.target.panelId)
       else entry.target.run()
+    },
+    renameGroup: (groupId, title) => {
+      progress.update((draft) => {
+        // A group the user added carries no published title, so the new name
+        // is the record itself; a registrant's group gains an override.
+        if (draft.created.some(custom => custom.id === groupId)) {
+          draft.created = draft.created
+            .map(custom => (custom.id === groupId ? { ...custom, title } : custom))
+          return
+        }
+        draft.renamed = { ...draft.renamed, [groupId]: title }
+      })
+    },
+    removeGroup: (groupId) => {
+      progress.update((draft) => {
+        if (draft.created.some(custom => custom.id === groupId)) {
+          draft.created = draft.created.filter(custom => custom.id !== groupId)
+          return
+        }
+        // Hidden, not deleted: the group's entries belong to its registrant,
+        // and a later load of the same distribution may publish it again.
+        if (draft.removed.includes(groupId)) return
+        draft.removed = [...draft.removed, groupId]
+      })
+    },
+    createGroup: (title) => {
+      const id = nextUserGroupId()
+      progress.update((draft) => {
+        draft.created = [...draft.created, { id, title }]
+      })
+      return id
     },
     retry: () => { retryAction?.() },
     dispose: () => {

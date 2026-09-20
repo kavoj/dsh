@@ -84,7 +84,7 @@ describe('ui-sidebar apply', () => {
     // group, which is what keeps the region out of the shell's DOM entirely.
     expect(injected.catalog).toBe(injected.hooks.catalog)
     expect(injected.catalog.getSnapshot()).toEqual({
-      claimed: false, status: 'ready', groups: [], canRetry: false,
+      claimed: false, status: 'ready', groups: [], canRetry: false, canManage: false,
     })
     expect(b.slots.entries('main')).toEqual([])
     // Both arms delegate to the Workspace UI's shared New Session action.

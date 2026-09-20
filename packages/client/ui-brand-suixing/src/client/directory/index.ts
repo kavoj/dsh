@@ -49,6 +49,10 @@ export function registerSuiXingDirectory(ctx: ClientContext): void {
         title: t(group.titleKey),
         hint: t(group.hintKey),
         allPanel: group.panelId,
+        // The sidebar may rename, remove, and add around these centres: the
+        // plan treats them as the user's own business areas. The choices stay
+        // browser-local, so nothing here is edited from the client.
+        manageable: group.manageable,
         entries: group.entries.map(capability => ({
           id: capability.id,
           label: t(capability.labelKey),

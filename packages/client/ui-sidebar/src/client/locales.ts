@@ -16,6 +16,17 @@ export const zh = {
   'catalog.error': '能力目录加载失败',
   'catalog.offline': '能力目录暂不可用，当前显示最近缓存。',
   'catalog.retry': '刷新',
+  'catalog.group.empty': '该分组暂无能力',
+  'catalog.create': '新增分组',
+  'catalog.actions': '“{name}”的分组操作',
+  'catalog.rename': '重命名',
+  'catalog.rename.title': '重命名分组',
+  'catalog.delete': '删除分组',
+  'catalog.delete.desc': '将把“{name}”从这个浏览器的侧栏移除。分组里的能力配置属于发行方，不受影响。',
+  'catalog.field.groupName': '分组名称',
+  'catalog.conflict.named': '已存在名为“{name}”的分组。',
+  'catalog.cancel': '取消',
+  'catalog.close': '关闭',
 } satisfies Record<string, string>
 
 /** The sidebar namespace key union. */
@@ -37,4 +48,15 @@ export const en = {
   'catalog.error': 'The capability directory failed to load',
   'catalog.offline': 'The capability directory is unavailable; showing the cached copy.',
   'catalog.retry': 'Refresh',
+  'catalog.group.empty': 'No capability in this group yet',
+  'catalog.create': 'New group',
+  'catalog.actions': 'Group actions for {name}',
+  'catalog.rename': 'Rename',
+  'catalog.rename.title': 'Rename group',
+  'catalog.delete': 'Delete group',
+  'catalog.delete.desc': 'This removes “{name}” from this browser’s sidebar. The group’s capability configuration belongs to the distribution and is left untouched.',
+  'catalog.field.groupName': 'Group name',
+  'catalog.conflict.named': 'A group named “{name}” already exists.',
+  'catalog.cancel': 'Cancel',
+  'catalog.close': 'Close',
 } satisfies Record<SidebarKey, string>
