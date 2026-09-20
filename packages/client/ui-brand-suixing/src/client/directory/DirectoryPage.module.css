@@ -193,6 +193,22 @@
   line-height: 20px;
 }
 
+/* The user's own capabilities, below the shipped catalogue: separated by a rule
+   rather than a different card shape, so the two halves read as one list. */
+.local {
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dsw-alias-separator-primary);
+}
+
+.localTitle {
+  margin: 0 0 4px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+
 @media (max-width: 720px) {
   .field {
     grid-template-columns: minmax(0, 1fr);

@@ -39,10 +39,10 @@ function translate(dict: Record<string, string>): DirectoryPageProps['t'] {
 }
 
 /** English-dictionary translate stub. */
-const t = translate(directoryEn as Record<string, string>)
+const t = translate(directoryEn)
 
 /** Chinese-dictionary translate stub, for the prototype-copy assertions. */
-const zhT = translate(directoryZh as Record<string, string>)
+const zhT = translate(directoryZh)
 
 /** The groups the prototypes define, by their stable ids. */
 const AGENTS = directoryGroup('suixing.ai-staff') as DirectoryGroupSpec

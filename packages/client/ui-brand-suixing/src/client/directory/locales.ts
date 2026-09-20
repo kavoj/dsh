@@ -29,6 +29,9 @@ export const directoryZh = {
   'page.search': '在本目录中搜索',
   'page.empty': '没有匹配的能力。',
   'page.count': '共 {count} 项能力',
+  'page.local': '你创建的',
+  'page.local.hint': '在「设置 → 随星业务中心」用一句话生成并保存的能力，会出现在这里，也会出现在侧栏。',
+  'page.local.badge': '本地',
 
   // Field terms shared by the capability definitions.
   'field.purpose': '用途说明',
@@ -171,6 +174,9 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'page.search': 'Search this directory',
   'page.empty': 'No capability matches.',
   'page.count': '{count} capabilities',
+  'page.local': 'Built by you',
+  'page.local.hint': 'Capabilities you drafted from a sentence in Settings → SuiXing business centres appear here, and in the sidebar.',
+  'page.local.badge': 'Local',
 
   'field.purpose': 'What it does',
   'field.tasks': 'Three quick tasks',
