@@ -6,14 +6,14 @@
  * starts is an ordinary Session, so nothing about this feature may invent a
  * second kind of conversation — the binding is a browser-local note and the
  * rows are a projection of the Host's own Session list. Second: "开始对话"
- * lands the conversation in the workspace the user is already working in,
- * bound on the way in, because that binding is the only thing the sidebar
- * needs to nest it.
+ * creates that Session outside every Workspace — the capability's menu is its
+ * only home, the workspace tree never claims it, and the binding is written
+ * before the conversation opens, because that is the only moment the caller
+ * learns the Session id.
  */
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createThreadLauncher, threadServices } from '../src/client/threads/launcher.ts'
 import { THREAD_VISIBLE_LIMIT, liveThreads, threadRows } from '../src/client/threads/spec.ts'
@@ -37,6 +37,7 @@ function record(capabilityId: string, sessionId: string, startedAt = 1) {
 /** One Session summary, with only the facts a nested row reads. */
 function summary(updatedAt: number, extra: Partial<{
   displayTitle: string
+  title: string
   blank: boolean
   running: boolean
 }> = {}) {
@@ -59,9 +60,30 @@ describe('capability conversations — the rows', () => {
     expect(rows).toEqual([])
   })
 
+  it('hides an archived conversation while keeping its binding alive', () => {
+    const rows = threadRows(
+      [record('chief', 's1'), record('chief', 's2', 2)],
+      { s1: summary(100, { displayTitle: '归档的' }), s2: summary(200, { displayTitle: '在的' }) },
+      undefined,
+      new Set(['s1']),
+    )
+    expect(rows.map(row => row.sessionId)).toEqual(['s2'])
+  })
+
   it('leaves an unnamed conversation titleless, for the sidebar to name', () => {
     const rows = threadRows([record('chief', 's1')], { s1: summary(1, { blank: true }) }, undefined)
     expect(rows[0]?.title).toBe('')
+  })
+
+  it('shows an explicit name even while the conversation is still blank', () => {
+    // A rename of a never-spoken-in conversation sets `title` without
+    // flipping `blank`; the chosen name must win over the placeholder.
+    const rows = threadRows(
+      [record('chief', 's1')],
+      { s1: summary(1, { blank: true, displayTitle: '新会话', title: '决策演练一' }) },
+      undefined,
+    )
+    expect(rows[0]?.title).toBe('决策演练一')
   })
 
   it('reports which conversation is on screen and which is working', () => {
@@ -162,36 +184,21 @@ function source<T>(value: T) {
   }
 }
 
-/** The three services the launcher resolves, with spies for what it calls. */
-function services(options: { workspaces?: boolean } = {}) {
-  const openWorkspace = vi.fn(async (
-    _id: string, beforeOpen?: (sessionId: string) => void,
-  ) => { beforeOpen?.('session-from-workspace') })
+/** The session services the launcher resolves, with spies for what it calls. */
+function services() {
   const openSession = vi.fn()
   const create = vi.fn(async () => 'session-created')
   const sessions = { list: source({ phase: 'ready', byId: {} }), create } as unknown as ISessions
-  const uiWorkspace = { openWorkspace, openSession } as unknown as UiWorkspace
-  const list = source({
-    phase: 'ready',
-    items: [
-      { workspaceId: 'ws-a', path: '/a', title: 'A', createdAt: '2026-01-01T00:00:00.000Z', sessionIds: [] },
-      { workspaceId: 'ws-b', path: '/b', title: 'B', createdAt: '2026-06-01T00:00:00.000Z', sessionIds: [] },
-    ],
-    archivedSessionIds: [],
-  })
-  return {
-    openWorkspace, openSession, create, sessions, uiWorkspace,
-    workspaces: (options.workspaces === false ? undefined : { list }) as unknown as IWorkspaces,
-  }
+  const uiWorkspace = { openSession } as unknown as UiWorkspace
+  return { openSession, create, sessions, uiWorkspace }
 }
 
 /** A cradle context carrying the services a build actually has. */
-function bench(options: { workspaces?: boolean } = {}) {
+function bench(options: { uiWorkspace?: boolean } = {}) {
   const ctx = new Context()
-  const parts = services(options)
+  const parts = services()
   ctx.provide('sessions', parts.sessions)
-  ctx.provide('uiWorkspace', parts.uiWorkspace)
-  if (parts.workspaces !== undefined) ctx.provide('workspaces', parts.workspaces)
+  if (options.uiWorkspace !== false) ctx.provide('uiWorkspace', parts.uiWorkspace)
   return { ctx, ...parts }
 }
 
@@ -214,45 +221,44 @@ describe('capability conversations — the launcher', () => {
     expect(threads.getSnapshot().records).toEqual([])
   })
 
-  it('starts the conversation in the workspace the user is working in', async () => {
+  it('creates the conversation outside every workspace, bound and opened', async () => {
     const subject = bench()
     const threads = createThreadsService()
     const launcher = createThreadLauncher(subject.ctx, threads)
     expect(launcher.available).toBe(true)
     launcher.start('chief')
-    await vi.waitFor(() => { expect(subject.openWorkspace).toHaveBeenCalled() })
-    // No Session is on screen, so the most recently touched workspace wins —
-    // the same policy the sidebar's own New Session control resolves.
-    expect(subject.openWorkspace.mock.calls[0]?.[0]).toBe('ws-b')
+    await vi.waitFor(() => { expect(subject.openSession).toHaveBeenCalled() })
+    // Born without a Workspace: the capability's menu is its only home, and
+    // the workspace tree never claims it.
+    expect(subject.create).toHaveBeenCalledWith({})
+    expect(subject.openSession).toHaveBeenCalledWith('session-created')
     // The binding is written before the conversation opens, which is the only
     // moment the caller learns the Session id.
-    expect(bindings(threads)).toEqual([['chief', 'session-from-workspace']])
-    expect(subject.create).not.toHaveBeenCalled()
+    expect(bindings(threads)).toEqual([['chief', 'session-created']])
   })
 
-  it('creates an ungrouped conversation when the Host knows of no workspace', async () => {
-    const subject = bench({ workspaces: false })
+  it('reports itself unavailable without the conversation view service', () => {
+    const subject = bench({ uiWorkspace: false })
     const threads = createThreadsService()
     const launcher = createThreadLauncher(subject.ctx, threads)
+    // Without the view service the launcher declines, and the caller keeps
+    // the fallback; the create service alone cannot show a conversation.
     expect(launcher.available).toBe(false)
-    // Without the workspace service the launcher declines, and the caller
-    // keeps the fallback; the session services alone are not enough to place
-    // a conversation somewhere the user can find it again.
     launcher.start('chief')
     expect(subject.create).not.toHaveBeenCalled()
   })
 
-  it('shows a conversation already bound to a capability', async () => {
+  it('shows a conversation already bound to a capability', () => {
     const subject = bench()
     const launcher = createThreadLauncher(subject.ctx, createThreadsService())
     launcher.open('session-7')
     expect(subject.openSession).toHaveBeenCalledWith('session-7')
   })
 
-  it('survives a workspace that refuses the conversation', async () => {
+  it('survives a create that refuses the conversation', async () => {
     const subject = bench()
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    subject.openWorkspace.mockRejectedValueOnce(new Error('offline'))
+    subject.create.mockRejectedValueOnce(new Error('offline'))
     createThreadLauncher(subject.ctx, createThreadsService()).start('chief')
     await vi.waitFor(() => {
       expect(warn).toHaveBeenCalledWith(
@@ -269,10 +275,10 @@ describe('capability conversations — the launcher', () => {
     createThreadLauncher(subject.ctx, threads, { assign } satisfies RolePresets)
       .start('chief')
     await vi.waitFor(() => {
-      expect(assign).toHaveBeenCalledWith('chief', 'session-from-workspace')
+      expect(assign).toHaveBeenCalledWith('chief', 'session-created')
     })
     // The binding — the sidebar's own note — is unchanged by the role.
-    expect(bindings(threads)).toEqual([['chief', 'session-from-workspace']])
+    expect(bindings(threads)).toEqual([['chief', 'session-created']])
   })
 
   it('starts a conversation even when the role binder throws', async () => {
@@ -283,10 +289,10 @@ describe('capability conversations — the launcher', () => {
       assign: () => { throw new Error('remote gone') },
     }).start('chief')
     await vi.waitFor(() => {
-      expect(subject.openWorkspace).toHaveBeenCalled()
+      expect(subject.openSession).toHaveBeenCalled()
     })
     // Work began; the role is presentation, never a precondition.
-    expect(bindings(threads)).toEqual([['chief', 'session-from-workspace']])
+    expect(bindings(threads)).toEqual([['chief', 'session-created']])
     warn.mockRestore()
   })
 })

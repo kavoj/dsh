@@ -37,6 +37,11 @@ export interface CapabilitySpec {
    * for a card. Absent means the card shows every field.
    */
   readonly card?: readonly CapabilityField[]
+  /**
+   * Opening questions the conversation's hero shows as one-tap starters.
+   * Absent means the hero carries the name, the promise, and the how-to only.
+   */
+  readonly starters?: readonly SuiXingDirectoryKey[]
 }
 
 /** One collapsible business menu plus the panel its directory opens. */
@@ -154,6 +159,8 @@ const CHIEF: CapabilitySpec = {
     { termKey: 'field.boundary', valueKey: 'entry.chief.boundary' },
     { termKey: 'field.mindset', valueKey: 'entry.chief.mindset' },
   ],
+  // The conversation hero's one-tap starters (页面原型 01_总裁决策官_进入页).
+  starters: ['starter.chief.1', 'starter.chief.2', 'starter.chief.3'],
   // The menu card keeps one row: the self-introduction carries the pitch.
   card: [
     { termKey: 'field.intro', valueKey: 'entry.chief.intro' },

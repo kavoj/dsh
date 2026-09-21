@@ -149,8 +149,11 @@ export function ProjectRowItem({ group, containsCurrentDescendant = false, onTog
   t: RowTranslate
 }) {
   const row = group
-  // The ungrouped bucket has no workspace title: its label is dictionary copy.
-  const label = row.workspaceId === undefined ? t('group.ungrouped') : row.label
+  // The ungrouped bucket has no workspace title: its label is the user's own
+  // rename when one exists, dictionary copy otherwise.
+  const label = row.workspaceId === undefined
+    ? (row.label !== '' ? row.label : t('group.ungrouped'))
+    : row.label
   const active = containsCurrentDescendant || (group.expanded && group.containsCurrent)
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaceMenuItems = [

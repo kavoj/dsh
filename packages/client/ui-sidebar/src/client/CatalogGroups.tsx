@@ -194,17 +194,7 @@ function CatalogGroupSection({
                 aria-label={t('catalog.children', { name: entry.label })}
               >
                 {entry.children.map(child => (
-                  <button
-                    key={child.id}
-                    type="button"
-                    className={css.childRow}
-                    aria-current={child.active === true ? 'page' : undefined}
-                    onClick={() => { onActivateChild(child) }}
-                  >
-                    <span className={css.childDot} data-state={childState(child)} aria-hidden="true" />
-                    <span className={css.childLabel}>{child.label}</span>
-                    {child.hint !== undefined && <span className={css.childHint}>{child.hint}</span>}
-                  </button>
+                  <CatalogChildRow key={child.id} child={child} onActivateChild={onActivateChild} />
                 ))}
               </div>
             )}
@@ -282,6 +272,73 @@ function NameDialog({
         </div>
       )}
     </Modal>
+  )
+}
+
+/**
+ * One nested row: the whole row opens the conversation; the trailing ellipsis
+ * (revealed on hover, the workspace browser's row-menu treatment) opens the
+ * actions the registrant published for it.
+ */
+function CatalogChildRow({
+  child, onActivateChild,
+}: {
+  child: CatalogChild
+  onActivateChild: (child: CatalogChild) => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  return (
+    <button
+      type="button"
+      className={css.childRow}
+      aria-current={child.active === true ? 'page' : undefined}
+      onClick={() => { onActivateChild(child) }}
+    >
+      <span className={css.childDot} data-state={childState(child)} aria-hidden="true" />
+      <span className={css.childLabel}>{child.label}</span>
+      {child.hint !== undefined && <span className={css.childHint}>{child.hint}</span>}
+      {child.menu !== undefined && child.menu.length > 0 && (
+        <span className={css.childActions}>
+          <Menu
+            open={menuOpen}
+            onClose={() => { setMenuOpen(false) }}
+            items={child.menu.map(action => ({
+              id: action.id,
+              label: action.label,
+              danger: action.danger === true,
+            }))}
+            onSelect={(id) => {
+              setMenuOpen(false)
+              const action = child.menu?.find(candidate => candidate.id === id)
+              action?.run()
+            }}
+            portal
+            closeOnPointerLeave
+            anchor={(
+              <span
+                role="button"
+                tabIndex={0}
+                className={css.childAction}
+                aria-label={child.label}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setMenuOpen(open => !open)
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    setMenuOpen(open => !open)
+                  }
+                }}
+              >
+                <IconEllipsisOutline16 />
+              </span>
+            )}
+          />
+        </span>
+      )}
+    </button>
   )
 }
 

@@ -37,6 +37,8 @@ import type { BridgesService } from '../bridges/store.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { registerSuiXingReferences } from '../references/index.ts'
 import { createRolePresets } from '../presets/index.ts'
+import { CapabilityHero } from '../threads/hero.tsx'
+import { createThreadDialogs, ThreadDialogModals } from '../threads/dialogs.tsx'
 import { createThreadLauncher } from '../threads/launcher.ts'
 import { threadRows, type ThreadSummary } from '../threads/spec.ts'
 import type { ThreadsService } from '../threads/store.ts'
@@ -67,7 +69,12 @@ type ThreadChildren = ReadonlyMap<string, readonly CatalogChild[]>
 interface SessionFacts {
   readonly summaries: Readonly<Record<string, ThreadSummary | undefined>>
   readonly current: string | undefined
+  /** Session ids the Host has archived; their rows are hidden, not unbound. */
+  readonly archived: ReadonlySet<string>
 }
+
+/** The archive set when this build has no Workspace Controller to ask. */
+const EMPTY_SET: ReadonlySet<string> = new Set()
 
 /**
  * Project one group descriptor plus the local capabilities onto the catalog
@@ -147,7 +154,46 @@ export function registerSuiXingDirectory(
   )
   const t = ctx.locale.bind(DIRECTORY_NS)
   const focus = createDirectoryFocus()
+  const dialogs = createThreadDialogs()
   const launcher = createThreadLauncher(ctx, threads, createRolePresets(ctx))
+  // The nested rows' trailing menus drive the rename/remove dialogs through
+  // the shell's overlay seat; a launcher without the session services keeps
+  // the menus absent rather than presenting doors that do not open.
+  const childMenu = (sessionId: string, label: string) => {
+    if (!launcher.available) return undefined
+    return [
+      {
+        id: 'rename',
+        label: t('entry.thread.rename'),
+        run: () => { dialogs.openRename(sessionId, label) },
+      },
+      {
+        id: 'remove',
+        label: t('entry.thread.remove'),
+        danger: true,
+        run: () => { dialogs.openRemove(sessionId, label) },
+      },
+    ]
+  }
+  ctx.effect(
+    () => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+      name: 'shell.overlay',
+      id: 'suixing-thread-dialogs',
+      locale: DIRECTORY_NS,
+      inject: () => ({ dialogs, launcher }),
+    }, ThreadDialogModals)),
+    'ui-brand-suixing: thread dialogs',
+  )
+  // A blank conversation's hero carries its capability's onboarding card;
+  // unclaimed conversations leave the hero exactly as the base built it.
+  ctx.effect(
+    () => ctx.slots.inject('conversation.hero.capability', () => ctx.slots.register({
+      name: 'conversation.hero.capability',
+      locale: DIRECTORY_NS,
+      inject: () => ({ threads }),
+    }, CapabilityHero)),
+    'ui-brand-suixing: capability hero',
+  )
   // One navigation, two writers: the sidebar entry and the card both say "show
   // this capability", and the panel that renders it is the menu's own.
   const openEntry = (panelId: MainPanelId, entryId: string): void => {
@@ -195,17 +241,23 @@ export function registerSuiXingDirectory(
   // predecessor by id, and the effect's disposer releases the last set.
   ctx.effect(() => {
     const sessions = ctx.get('sessions')
+    const workspaces = ctx.get('workspaces')
     let disposers: readonly (() => void)[] = []
     let signature = ''
 
     const sessionFacts = (): SessionFacts => {
-      if (sessions === undefined) return { summaries: {}, current: undefined }
+      if (sessions === undefined) return { summaries: {}, current: undefined, archived: EMPTY_SET }
       const list = sessions.list.getSnapshot()
       return {
         summaries: list.byId,
         // The conversation on screen is the one whose row shows as current.
         current: Object.values(list.byId)
           .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id,
+        // An archived conversation is hidden by the workspace tree and hidden
+        // here too — "删除对话" archives the Session, so the nested row goes
+        // with it while the binding survives a later unarchive.
+        archived: new Set(workspaces?.list.getSnapshot().archivedSessionIds
+          .map(id => String(id)) ?? []),
       }
     }
 
@@ -214,15 +266,20 @@ export function registerSuiXingDirectory(
       for (const record of threads.getSnapshot().records) {
         if (children.has(record.capabilityId)) continue
         children.set(record.capabilityId, threadRows(threads.of(record.capabilityId),
-          facts.summaries, facts.current).map(row => ({
-          id: row.sessionId,
-          // A conversation nobody has named yet is named here, in the sidebar's
-          // own words for exactly that: a new conversation.
-          label: row.title === '' ? t('entry.thread.blank') : row.title,
-          target: { kind: 'command' as const, run: () => { launcher.open(row.sessionId) } },
-          running: row.running,
-          active: row.active,
-        })))
+          facts.summaries, facts.current, facts.archived).map((row) => {
+          const label = row.title === '' ? t('entry.thread.blank') : row.title
+          const menu = childMenu(row.sessionId, label)
+          return {
+            id: row.sessionId,
+            // A conversation nobody has named yet is named here, in the
+            // sidebar's own words for exactly that: a new conversation.
+            label,
+            target: { kind: 'command' as const, run: () => { launcher.open(row.sessionId) } },
+            running: row.running,
+            active: row.active,
+            ...(menu === undefined ? {} : { menu }),
+          }
+        }))
       }
       return children
     }
@@ -253,6 +310,11 @@ export function registerSuiXingDirectory(
         if (list.phase === 'ready') threads.keep(new Set(Object.keys(list.byId)))
         publish(false)
       }))
+    }
+    if (workspaces !== undefined) {
+      // Archiving moves a Session between visible and hidden without touching
+      // the Session list, so the archive set needs its own republish trigger.
+      stops.push(workspaces.list.subscribe(() => { publish(false) }))
     }
     return () => {
       for (const stop of stops) stop()

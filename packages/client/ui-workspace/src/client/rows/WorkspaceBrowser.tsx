@@ -43,6 +43,23 @@ const SEARCH_QUERY_MAX_CODE_UNITS = 500
 /** Session rows visible per Workspace before the local overflow control. */
 const COLLAPSED_SESSION_LIMIT = 5
 
+const NO_HIDDEN: ReadonlySet<SessionId> = new Set()
+
+/**
+ * Drop the excluded sessions from a list snapshot in one place, so every
+ * downstream derivation (groups, flat list, ungrouped order, search) sees the
+ * same visibility. The excluded ids come from the optional
+ * `sessionTreeExclusion` service; without one this is the identity.
+ */
+function withoutExcluded(list: SessionListState, excluded: ReadonlySet<SessionId>): SessionListState {
+  if (excluded.size === 0) return list
+  const byId: SessionListState['byId'] = {}
+  for (const [id, summary] of Object.entries(list.byId)) {
+    if (!excluded.has(id as SessionId)) byId[id as SessionId] = summary
+  }
+  return { ...list, ids: list.ids.filter(id => !excluded.has(id)), byId }
+}
+
 /** Fold one Workspace without charging its provisional New Session against the ordinary-row limit. */
 function collapsedSessionRows(sessions: readonly SessionNode[]): {
   rows: readonly SessionNode[]
@@ -196,6 +213,12 @@ type SessionTreeProps = Pick<
   onRenameRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
   /** Open the browser-owned delete-confirmation dialog for a real Workspace group. */
   onDeleteRequest: (workspaceId: WorkspaceId, currentTitle: string) => void
+  /** Open the rename dialog for the ungrouped bucket (a browser-local name). */
+  onUngroupedRenameRequest: (currentLabel: string) => void
+  /** Open the ungrouped-bucket removal dialog (archives every member). */
+  onUngroupedDeleteRequest: () => void
+  /** The user's own name for the ungrouped bucket; empty falls back to copy. */
+  ungroupedLabel: string
   /** Open the browser-owned session rename dialog. */
   onSessionRename: (sessionId: SessionNode['id'], currentTitle: string) => void
   /** Archive a session (row menu action; the row disappears on the state echo). */
@@ -212,6 +235,7 @@ function SessionTree({
   archivedSessionIds,
   workspaceReady, usePanelInfo,
   onRenameRequest, onDeleteRequest, onSessionRename, onSessionArchive,
+  onUngroupedRenameRequest, onUngroupedDeleteRequest, ungroupedLabel,
   insertWorkspaceBefore,
   nestWorkspaces, groupExpansion, setGroupExpanded,
   setSessionOrder, home, t,
@@ -267,6 +291,16 @@ function SessionTree({
       ungroupedOrder: ungroupedSessionIds,
     }),
     [list, workspaces, archivedSessionIds, statuses, expandedGroups, ungroupedSessionIds],
+  )
+  // The ungrouped bucket takes its display name from the user's own rename
+  // (empty falls back to the dictionary label the derived group carries).
+  const displayGroups = useMemo(
+    () => ungroupedLabel === ''
+      ? groups
+      : groups.map(group => group.key === UNGROUPED_KEY
+        ? { ...group, label: ungroupedLabel }
+        : group),
+    [groups, ungroupedLabel],
   )
   useEffect(() => {
     for (let key = revealGroup; key !== undefined; key = parents.get(key)) {
@@ -356,14 +390,14 @@ function SessionTree({
   }
   const childrenByParent = useMemo(() => {
     const children = new Map<string | undefined, GroupNode[]>()
-    for (const group of groups) {
+    for (const group of displayGroups) {
       const parent = parents.get(group.key)
       const siblings = children.get(parent)
       if (siblings === undefined) children.set(parent, [group])
       else siblings.push(group)
     }
     return children
-  }, [groups, parents])
+  }, [displayGroups, parents])
   const rootGroups = childrenByParent.get(undefined) ?? []
   const workspaceDropAtListStart = rootGroups[0]?.workspaceId !== undefined
     && workspaceDrag?.over?.id === rootGroups[0].workspaceId
@@ -463,7 +497,10 @@ function SessionTree({
           }}
           drag={workspaceDragProps}
           actions={group.workspaceId === undefined
-            ? undefined
+            ? {
+              rename: () => { onUngroupedRenameRequest(group.label) },
+              delete: () => { onUngroupedDeleteRequest() },
+            }
             : {
               rename: () => {
               /* v8 ignore next -- narrowing guard: the actions object exists only for real-workspace groups. */
@@ -679,7 +716,6 @@ interface RemoteSearchState {
 
 /** Flat search body: local metadata matches plus the current Host result page. */
 function SearchResults({
-  useSessions,
   useSessionStatus,
   open,
   workspaces,
@@ -688,16 +724,18 @@ function SearchResults({
   remote,
   resultLimit,
   usePanelInfo,
+  list,
   t,
-}: Pick<WorkspaceBrowserProps, 'useSessions' | 'useSessionStatus' | 'open' | 't' | 'usePanelInfo'> & {
+}: Pick<WorkspaceBrowserProps, 'useSessionStatus' | 'open' | 't' | 'usePanelInfo'> & {
   workspaces: readonly WorkspaceView[]
   archivedSessionIds: readonly SessionNode['id'][]
   query: string
   remote: RemoteSearchState
   resultLimit: number
+  /** The (already exclusion-filtered) session list snapshot. */
+  list: SessionListState
 }) {
   const panelActive = usePanelInfo(info => info.activePanelId !== null)
-  const list = useSessions(s => s)
   const statuses = useSessionStatus(s => s)
   const currentRemote = remote.query === query
     ? remote
@@ -781,6 +819,7 @@ export function WorkspaceBrowser({
   createWorkspace,
   searchSessions,
   searchResultLimit,
+  sessionTreeExclusion,
   useDirectoryFlow,
   useHostInfo,
   renderSlot,
@@ -788,7 +827,21 @@ export function WorkspaceBrowser({
 }: WorkspaceBrowserProps) {
   const home = useHostInfo(info => info.home)
   // Ordering remains live while the rail or search replaces the list body.
-  const list = useSessions(state => state)
+  const rawList = useSessions(state => state)
+  // The exclusion service is a stable inject object; its id set is a fresh
+  // snapshot per read, so the memo keys on the sorted ids instead.
+  const hiddenSnapshot = sessionTreeExclusion?.hiddenSessionIds()
+  const hiddenKey = hiddenSnapshot === undefined || hiddenSnapshot.size === 0
+    ? ''
+    : [...hiddenSnapshot].sort().join('\n')
+  const hidden = useMemo<ReadonlySet<SessionId>>(() => {
+    if (hiddenKey === '') return NO_HIDDEN
+    return new Set(hiddenKey.split('\n')) as unknown as ReadonlySet<SessionId>
+  }, [hiddenKey])
+  const list = useMemo(
+    () => withoutExcluded(rawList, hidden),
+    [rawList, hidden],
+  )
   const workspaces = useWorkspaces(state => state.items)
   const workspacePhase = useWorkspaces(state => state.phase)
   const workspaceStreamState = useWorkspaces(state => state.state)
@@ -800,6 +853,7 @@ export function WorkspaceBrowser({
   const orderBy = useStore(s => s.orderBy)
   const groupExpansion = useStore(s => s.groupExpansion)
   const sessionOrderByAccount = useStore(s => s.sessionOrderByAccount)
+  const ungroupedLabel = useStore(s => s.ungroupedLabel)
   const workspaceReady = workspacePhase === 'ready' && workspaceStreamState !== 'loading'
   const mainSessionId = Object.values(list.byId)
     .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
@@ -1004,7 +1058,10 @@ export function WorkspaceBrowser({
   }, [normalizedQuery, searchSessions])
 
   // Rename dialog (browser-owned so it outlives row unmounts during collapse).
-  const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId; currentTitle: string } | null>(null)
+  // The ungrouped bucket carries the UNGROUPED_KEY sentinel in place of a
+  // workspace id: it has no Workspace row, so its rename is a browser-local
+  // display name rather than a Host write.
+  const [renameTarget, setRenameTarget] = useState<{ workspaceId: WorkspaceId | typeof UNGROUPED_KEY; currentTitle: string } | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
@@ -1019,7 +1076,13 @@ export function WorkspaceBrowser({
     setRenameError(null)
   }
   const confirmRename = () => {
+    /* v8 ignore next -- the Modal is absent without a target and its button is disabled while blocked. */
     if (renameBlocked) return
+    if (renameTarget.workspaceId === UNGROUPED_KEY) {
+      actions.setUngroupedLabel(renameTrimmed)
+      setRenameTarget(null)
+      return
+    }
     setRenaming(true)
     setRenameError(null)
     renameWorkspace(renameTarget.workspaceId, renameTrimmed).then(() => {
@@ -1106,6 +1169,28 @@ export function WorkspaceBrowser({
     }).catch((reason: unknown) => {
       setDeleting(false)
       setDeleteError(reason instanceof Error ? reason.message : String(reason))
+    })
+  }
+
+  // Removing the ungrouped bucket means archiving every member — the
+  // bucket itself is a projection, so its delete is the members' exit. The
+  // user's rename (if any) goes with it; the next stray session starts a
+  // fresh, dictionary-named bucket.
+  const [ungroupedDeleteOpen, setUngroupedDeleteOpen] = useState(false)
+  const [ungroupedDeleting, setUngroupedDeleting] = useState(false)
+  const closeUngroupedDelete = () => {
+    if (ungroupedDeleting) return
+    setUngroupedDeleteOpen(false)
+  }
+  const confirmUngroupedDelete = () => {
+    if (ungroupedDeleting) return
+    setUngroupedDeleting(true)
+    void Promise.all(ungroupedMemberIds.map(id => archiveSession(id).catch((reason: unknown) => {
+      console.warn('ungrouped archive rejected:', reason)
+    }))).then(() => {
+      setUngroupedDeleting(false)
+      setUngroupedDeleteOpen(false)
+      actions.setUngroupedLabel('')
     })
   }
 
@@ -1247,7 +1332,6 @@ export function WorkspaceBrowser({
           ? (
             <SearchResults
               usePanelInfo={usePanelInfo}
-              useSessions={useSessions}
               useSessionStatus={useSessionStatus}
               open={openSearchResult}
               workspaces={workspaces}
@@ -1255,6 +1339,7 @@ export function WorkspaceBrowser({
               query={normalizedQuery}
               remote={remoteSearch}
               resultLimit={searchResultLimit}
+              list={list}
               t={t}
             />
           )
@@ -1305,6 +1390,13 @@ export function WorkspaceBrowser({
                   setDeleteTarget({ workspaceId, title })
                   setDeleteError(null)
                 }}
+                onUngroupedRenameRequest={(currentLabel) => {
+                  setRenameTarget({ workspaceId: UNGROUPED_KEY, currentTitle: currentLabel })
+                  setRenameDraft(currentLabel)
+                  setRenameError(null)
+                }}
+                onUngroupedDeleteRequest={() => { setUngroupedDeleteOpen(true) }}
+                ungroupedLabel={ungroupedLabel}
               />
             ))}
       </div>
@@ -1313,7 +1405,9 @@ export function WorkspaceBrowser({
         open={renameTarget !== null}
         onClose={closeRename}
         closeLabel={t('close')}
-        title={t('rename.workspace.title')}
+        title={renameTarget !== null && renameTarget.workspaceId === UNGROUPED_KEY
+          ? t('rename.ungrouped.title')
+          : t('rename.workspace.title')}
         footer={(
           <>
             <Button variant="outline" disabled={renaming} onClick={closeRename}>{t('cancel')}</Button>
@@ -1399,6 +1493,31 @@ export function WorkspaceBrowser({
       >
         {deleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
         {deleteError !== null && <div className={css.renameError} role="alert">{deleteError}</div>}
+      </Modal>
+
+      <Modal
+        open={ungroupedDeleteOpen}
+        onClose={closeUngroupedDelete}
+        closeLabel={t('close')}
+        title={t('ungrouped.delete.title')}
+        description={t('ungrouped.delete.desc', { n: ungroupedMemberIds.length })}
+        footer={(
+          <>
+            <Button variant="outline" disabled={ungroupedDeleting} onClick={closeUngroupedDelete}>
+              {t('cancel')}
+            </Button>
+            <Button
+              variant="outline"
+              className={css.deleteAction}
+              disabled={ungroupedDeleting}
+              onClick={confirmUngroupedDelete}
+            >
+              {t('ungrouped.delete.title')}
+            </Button>
+          </>
+        )}
+      >
+        {ungroupedDeleting && <div className={css.deleteStatus} role="status">{t('delete.pending')}</div>}
       </Modal>
     </div>
   )

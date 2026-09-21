@@ -23,6 +23,11 @@ type WorkspaceViewState = {
   groupExpansion: Record<string, boolean>
   /** Saved manual order per Workspace group plus the browser-local flat-list account. */
   sessionOrderByAccount: Record<string, string[]>
+  /**
+   * The user's own name for the ungrouped bucket — it has no Workspace row to
+   * take a title from. Empty falls back to the dictionary label.
+   */
+  ungroupedLabel: string
 }
 
 /**
@@ -48,6 +53,7 @@ type WorkspaceViewActions = {
     order: readonly string[],
     initialOrders: Readonly<Record<string, readonly string[]>>,
   ) => void
+  setUngroupedLabel: (draft: WorkspaceViewState, title: string) => void
 }
 
 /** Copy read-only projections into the persisted mutable store representation. */
@@ -68,10 +74,12 @@ export function createWorkspaceViewStore(): EngineStoreHandle<WorkspaceViewState
       orderBy: 'updated',
       groupExpansion: {},
       sessionOrderByAccount: {},
+      ungroupedLabel: '',
     }),
     persist: 'dsh.workspace.view.v5',
     actions: {
       setGroupBy: (d, mode: SessionGroupBy) => { d.groupBy = mode },
+      setUngroupedLabel: (d, title: string) => { d.ungroupedLabel = title.trim() },
       setOrderBy: (d, mode: SessionOrderBy, initialOrders) => {
         if (mode === d.orderBy) return
         d.sessionOrderByAccount = mode === 'manual' ? copySessionOrders(initialOrders) : {}

@@ -184,6 +184,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'conversation.hero.brand.mark': { kind: 'single'; scope: 'root'; owner: HeroBrandMarkOwnerProps }
     /** Agent-preset control staged for a New Session. */
     'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe'; owner: HeroAgentPresetOwnerProps }
+    /**
+     * Distribution capability guidance under the blank-session headline:
+     * the named conversation's own onboarding card. Empty (the Hero renders
+     * exactly as before) unless a distribution fills it.
+     */
+    'conversation.hero.capability': { kind: 'single'; scope: 'session-maybe'; owner: HeroCapabilityOwnerProps }
     /** Full-width entries above the composer card. */
     'conversation.input.dock': { kind: 'list'; scope: 'session'; owner: InputZone }
     /** Floating entries rendered inside the resident composer card. */
@@ -223,6 +229,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.brand.mark': { kind: 'single'; scope: 'root' }
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
+        'conversation.hero.capability': { kind: 'single'; scope: 'session-maybe' }
       }
       inject: ConversationInjected
       locale: 'conversation'
@@ -260,6 +267,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Owner share of the Hero agent-preset control. */
 export interface HeroAgentPresetOwnerProps {
   /** Marker field: the occupant owns its roster and staged selection. */
+  children?: never
+}
+
+/** Owner share of the Hero capability-guidance card. */
+export interface HeroCapabilityOwnerProps {
+  /** Marker field: the occupant resolves the conversation's capability itself. */
   children?: never
 }
 

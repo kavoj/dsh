@@ -98,6 +98,18 @@ export type WorkspaceBrowserInjected = {
     hostInfo: HostObservable<RemoteHostFacts>
   }
   /**
+   * Sessions the browser must not render, supplied by an optional
+   * distribution service (`sessionTreeExclusion` on the client context). A
+   * capability conversation stays in the capability's own menu instead of
+   * doubling into the workspace tree, so the browser drops the ids outright —
+   * groups, flat list, and search alike. Absent when no distribution
+   * provides the service; the tree then renders every visible Session.
+   */
+  sessionTreeExclusion?: {
+    /** The ids to drop, snapshotted per read. */
+    hiddenSessionIds(): ReadonlySet<SessionId>
+  }
+  /**
    * Start a New Session in a Workspace: reuse-or-create its blank session and
    * open it; without an explicit workspace, inherit the current Session
    * Workspace, then the recent Workspace, or clear into the New Session view.

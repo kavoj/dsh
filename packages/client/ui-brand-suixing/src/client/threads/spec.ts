@@ -39,6 +39,12 @@ export interface ThreadRecord {
 export interface ThreadSummary {
   /** The title the Host stored; empty until the conversation is named. */
   readonly displayTitle: string
+  /**
+   * The user- or Host-set title, present only once somebody has actually
+   * named the conversation. A rename of a still-blank conversation sets it
+   * without flipping `blank`, so it wins over the blank placeholder below.
+   */
+  readonly title?: string
   /** A Session born but not yet spoken in. */
   readonly blank: boolean
   readonly updatedAt: number
@@ -62,15 +68,19 @@ export interface ThreadRow {
  * @param records - the conversations bound to this capability.
  * @param summaries - the current Session list, keyed by Session id.
  * @param current - the Session showing in the main view, when there is one.
+ * @param archived - Session ids the Host archived; their rows hide, the way
+ *   the workspace tree hides them, so the binding survives an unarchive.
  * @returns the rows, in render order.
  */
 export function threadRows(
   records: readonly ThreadRecord[],
   summaries: Readonly<Record<string, ThreadSummary | undefined>>,
   current: string | undefined,
+  archived: ReadonlySet<string> = new Set(),
 ): readonly ThreadRow[] {
   return records
     .flatMap((record) => {
+      if (archived.has(record.sessionId)) return []
       const summary = summaries[record.sessionId]
       // A Session the Host no longer lists was archived or deleted: the row
       // goes with it rather than becoming a door to nothing.
@@ -81,7 +91,9 @@ export function threadRows(
     .slice(0, THREAD_VISIBLE_LIMIT)
     .map(({ record, summary }) => ({
       sessionId: record.sessionId,
-      title: summary.blank ? '' : summary.displayTitle,
+      // An explicit name beats blankness: renaming a conversation the user
+      // has not spoken in yet must still show the name they chose.
+      title: summary.title ?? (summary.blank ? '' : summary.displayTitle),
       running: summary.running,
       active: record.sessionId === current,
     }))

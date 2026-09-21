@@ -744,17 +744,25 @@ describe('WorkspaceBrowser', () => {
     expect(startSession).toHaveBeenCalledWith(wid('alpha'))
   })
 
-  it('auto-expands the Ungrouped bucket for a loose current session; its header has no menu and its ＋ is inert', () => {
+  it('auto-expands the Ungrouped bucket for a loose current session; its header renames and its ＋ is inert', () => {
     const startSession = vi.fn()
-    mount({
+    const mounted = mount({
       useSessions: hook(sessionState([summary('loose', 1)], { main: sid('loose') })),
       useWorkspaces: hook(workspaceState([workspace('alpha', [])])),
       startSession,
     })
     // The loose session's group is UNGROUPED_KEY: expanded by the effect.
     expect(screen.getByText('loose')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: '工作区“未分组”的操作' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '在“未分组”中新建会话' }))
+    // The bucket is manageable: rename and clear live in its header menu.
+    fireEvent.click(screen.getByRole('button', { name: '工作区“未分组”的操作' }))
+    fireEvent.click(screen.getByText('重命名'))
+    fireEvent.change(screen.getByLabelText('工作区名称'), { target: { value: '我的会话' } })
+    fireEvent.click(screen.getByRole('button', { name: '重命名' }))
+    expect(mounted.store.actions.setUngroupedLabel).toBeDefined()
+    expect(mounted.store.getSnapshot().ungroupedLabel).toBe('我的会话')
+    // The renamed label propagates to the row: title, actions aria, and ＋.
+    expect(screen.getByText('我的会话')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '在“我的会话”中新建会话' }))
     expect(startSession).not.toHaveBeenCalled()
   })
 

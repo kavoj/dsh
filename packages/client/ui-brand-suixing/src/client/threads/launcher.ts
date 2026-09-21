@@ -1,19 +1,12 @@
 /**
  * Starting a conversation for a capability.
  *
- * The conversation is an ordinary Session: the Host creates it, the Session
- * Controller lists it, the conversation panel renders it, and the workspace
- * browser keeps showing it exactly as it shows any other. This module only
- * decides *where* it is born and remembers *who* asked for it — which is what
- * lets the sidebar nest it under that capability instead of losing it in a
- * list of every conversation in the workspace.
- *
- * The conversation itself stays an ordinary Session: the Host creates it, the
- * Session Controller lists it, the conversation panel renders it, and the
- * workspace browser keeps showing it exactly as it shows any other. This
- * module only decides *where* it is born and remembers *who* asked for it —
- * which is what lets the sidebar nest it under that capability instead of
- * losing it in a list of every conversation in the workspace.
+ * The conversation is an ordinary Session — the Host creates it, the Session
+ * Controller lists it, the conversation panel renders it — but it is born
+ * outside every Workspace, so the workspace tree never claims it and it stays
+ * a child of its capability alone (the tree drops bound ids through the
+ * `sessionTreeExclusion` service). This module decides *where* it is born and
+ * remembers *who* asked for it.
  *
  * Role is the Host's own concept too: a capability that speaks in role maps
  * to an agent preset (`presets/spec.ts`), and the binding below hands the
@@ -23,7 +16,6 @@
  * deployment's default composition, exactly as before.
  */
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { IWorkspaces, WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -48,13 +40,24 @@ export interface ThreadLauncher {
    * @param sessionId - the Session to display.
    */
   open(sessionId: string): void
+  /**
+   * Rename one conversation (the Host's own session title).
+   * @param sessionId - the Session to retitle.
+   * @param title - the user's title, already trimmed.
+   */
+  rename(sessionId: string, title: string): Promise<void>
+  /**
+   * Remove one conversation from the sidebar by archiving the Session —
+   * the Host's own hide-with-recall semantics, never a log deletion.
+   * @param sessionId - the Session to archive.
+   */
+  remove(sessionId: string): Promise<void>
 }
 
-/** Services the launcher needs; all three ship with the assembled web client. */
+/** Services the launcher needs; both ship with the assembled web client. */
 interface ThreadServices {
   readonly sessions: ISessions
   readonly uiWorkspace: UiWorkspace
-  readonly workspaces: IWorkspaces
 }
 
 /**
@@ -65,10 +68,9 @@ interface ThreadServices {
 export function threadServices(ctx: ClientContext): ThreadServices | undefined {
   const sessions = ctx.get('sessions')
   const uiWorkspace = ctx.get('uiWorkspace')
-  const workspaces = ctx.get('workspaces')
-  return sessions === undefined || uiWorkspace === undefined || workspaces === undefined
+  return sessions === undefined || uiWorkspace === undefined
     ? undefined
-    : { sessions, uiWorkspace, workspaces }
+    : { sessions, uiWorkspace }
 }
 
 /**
@@ -88,9 +90,15 @@ export function createThreadLauncher(
 ): ThreadLauncher {
   const services = threadServices(ctx)
   if (services === undefined) {
-    return { available: false, start: () => {}, open: () => {} }
+    return {
+      available: false,
+      start: () => {},
+      open: () => {},
+      rename: () => Promise.resolve(),
+      remove: () => Promise.resolve(),
+    }
   }
-  const { sessions, uiWorkspace, workspaces } = services
+  const { sessions, uiWorkspace } = services
 
   const start = (capabilityId: string): void => {
     void begin(capabilityId).catch((reason: unknown) => {
@@ -99,62 +107,22 @@ export function createThreadLauncher(
   }
 
   /**
-   * Land the conversation where this user is already working, and bind it on
-   * the way in. The navigation hands the Session id back *before* it opens the
-   * conversation, which is the only moment the caller learns it — the Session
-   * Controller's older create path returns one without selecting it, and
-   * selecting it is half of what "开始对话" means.
+   * A capability conversation is born outside every Workspace: created
+   * without one, it never enters the workspace tree's groups, so it stays a
+   * child of its capability alone (the tree drops bound ids through the
+   * `sessionTreeExclusion` service). The navigation hands the Session id back
+   * after the create resolves, which is the only moment the caller learns it
+   * — selecting it is half of what "开始对话" means.
    * @param capabilityId - the capability to start work for.
    */
   const begin = async (capabilityId: string): Promise<void> => {
-    const target = currentWorkspace()
-    if (target === undefined) {
-      const sessionId = await sessions.create({})
-      threads.bind(capabilityId, sessionId)
-      rolePresets?.assign(capabilityId, sessionId)
-      uiWorkspace.openSession(sessionId)
-      return
-    }
-    await uiWorkspace.openWorkspace(target, (sessionId) => {
-      threads.bind(capabilityId, sessionId)
-      rolePresets?.assign(capabilityId, sessionId)
-    })
-  }
-
-  /**
-   * The workspace this conversation should belong to: the one already on
-   * screen, else the most recently touched, exactly the policy the sidebar's
-   * own New Session control resolves. A conversation a capability starts is
-   * still a workspace's conversation.
-   * @returns the workspace, or undefined when the browser knows of none yet.
-   */
-  const currentWorkspace = (): WorkspaceId | undefined => {
-    const list = workspaces.list.getSnapshot()
-    const known = sessions.list.getSnapshot()
-    if (list.phase !== 'ready' || known.phase !== 'ready') return undefined
-    const onScreen = Object.values(known.byId)
-      .find(session => (session.retainedBy.mainView ?? 0) > 0)?.id
-    const owner = onScreen === undefined
-      ? undefined
-      : list.items.find(item => item.sessionIds.includes(onScreen))?.workspaceId
-    if (owner !== undefined) return owner
-    let latest: WorkspaceId | undefined
-    let latestAt = Number.NEGATIVE_INFINITY
-    for (const item of list.items) {
-      let touched = Number.NEGATIVE_INFINITY
-      for (const sessionId of item.sessionIds) {
-        const summary = known.byId[sessionId]
-        if (summary !== undefined) touched = Math.max(touched, summary.updatedAt)
-      }
-      // A workspace nobody has talked in yet is dated from its own creation,
-      // so a fresh install still has somewhere to start a conversation.
-      if (touched === Number.NEGATIVE_INFINITY) touched = Date.parse(item.createdAt)
-      if (latest === undefined || touched > latestAt) {
-        latest = item.workspaceId
-        latestAt = touched
-      }
-    }
-    return latest
+    const sessionId = await sessions.create({})
+    threads.bind(capabilityId, sessionId)
+    // Open first: the conversation is the product, and the role below is
+    // presentation — a binder failure must never leave the user on the page
+    // they started from. The session is still blank here, so `select` applies.
+    uiWorkspace.openSession(sessionId)
+    rolePresets?.assign(capabilityId, sessionId)
   }
 
   return {
@@ -164,5 +132,17 @@ export function createThreadLauncher(
     // as text. This is the one boundary where that id becomes a Session the
     // Controller will address.
     open: (sessionId) => { uiWorkspace.openSession(sessionId as SessionId) },
+    // The same rename path the workspace browser's own row menu drives: the
+    // Host session face, taken through a reference so the title change is
+    // the Host's, not a local overlay.
+    rename: async (sessionId, title) => {
+      const result = await sessions.using(
+        sessionId as SessionId,
+        { source: 'workspaceOperation' },
+        reference => reference.binding.session.rename(title),
+      )
+      if (!result.ok) throw new Error(result.error.message)
+    },
+    remove: async (sessionId) => { await uiWorkspace.archiveSession(sessionId as SessionId) },
   }
 }

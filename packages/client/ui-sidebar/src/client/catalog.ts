@@ -35,6 +35,18 @@ export type CatalogEntryTarget =
   | { readonly kind: 'panel'; readonly panelId: MainPanelId }
   | { readonly kind: 'command'; readonly run: () => void }
 
+/** One row of a child row's trailing menu. */
+export interface CatalogChildAction {
+  /** Stable action id, dispatched back to the run below. */
+  readonly id: string
+  /** Already-localized menu text. */
+  readonly label: string
+  /** Render with the destructive treatment. */
+  readonly danger?: boolean
+  /** Perform the action; the row's own activation is not triggered. */
+  readonly run: () => void
+}
+
 /**
  * One row a registrant nests under an entry.
  *
@@ -42,7 +54,9 @@ export type CatalogEntryTarget =
  * that the user can walk back into — in this distribution, the conversations
  * it started. The shell renders them under their entry and knows nothing else
  * about them, so a registrant that never publishes children keeps the DOM it
- * had.
+ * had. A child that publishes `menu` also carries a trailing ellipsis control
+ * (revealed on hover, the workspace browser's own row-menu treatment) whose
+ * rows dispatch back to the registrant's runs.
  */
 export interface CatalogChild {
   /** Stable identity; in this distribution the Session id. */
@@ -59,6 +73,8 @@ export interface CatalogChild {
   readonly unread?: boolean
   /** This row stands for what is currently on screen. */
   readonly active?: boolean
+  /** Optional trailing row menu (rename, remove, …). */
+  readonly menu?: readonly CatalogChildAction[]
 }
 
 /** One capability a group offers. */

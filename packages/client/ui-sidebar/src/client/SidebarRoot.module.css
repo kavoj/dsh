@@ -499,10 +499,11 @@
 /* Catalog seat: a bounded, self-scrolling stack BELOW the workspace browser,
    so a distribution's business centres sit under the workspace list the user
    already knows, not above it (the global panel rows stay directly under New
-   Session). `flex: none` keeps the stack whole: the browser above it owns the
-   slack, so a long catalogue scrolls instead of squeezing the list. The seat
-   is absent from the DOM entirely until a distribution publishes a group, so
-   the default sidebar keeps its layout. */
+   Session). `flex: none` keeps the stack whole and hugging the browser above
+   it: the slack moves to the space between the stack and the foot, so the
+   centres read as the list's neighbours instead of bottom-docked rows. The
+   seat is absent from the DOM entirely until a distribution publishes a
+   group, so the default sidebar keeps its layout. */
 .catalogArea {
   flex: none;
   min-height: 0;
@@ -513,9 +514,12 @@
 
 /* Region seat: always mounted so the foot never moves. Its trailing margin
    cancels the wide shell inset so the nested scrollbar can sit at the sidebar
-   edge; the browser restores that inset inside its own rows. */
+   edge; the browser restores that inset inside its own rows. Height follows
+   the browser's content (`flex: 0 1 auto`) and shrinks under pressure, which
+   is what lets the catalog stack sit right beneath the workspace list
+   instead of being pushed to the foot by the browser's slack. */
 .regionArea {
-  flex: 1;
+  flex: 0 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -535,6 +539,9 @@
    button geometry and hover chrome. */
 .footArea {
   flex: none;
+  /* The region seat no longer owns the slack (it hugs its content now), so
+     the foot pins itself to the column's end. */
+  margin-top: auto;
   display: flex;
   flex-direction: column;
 }

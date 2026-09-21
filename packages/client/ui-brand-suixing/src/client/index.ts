@@ -104,6 +104,13 @@ export function apply(ctx: ClientContext): void {
   const centers = createCentersService()
   const bridges = createBridgesService()
   const threads: ThreadsService = createThreadsService()
+  // The workspace tree drops every bound conversation: a capability's chat
+  // lives in its capability's own menu, not doubled into the workspace list.
+  // Optional service — absent without this distribution, the tree renders
+  // everything it did before.
+  ctx.provide('sessionTreeExclusion', {
+    hiddenSessionIds: () => new Set(threads.getSnapshot().records.map(record => record.sessionId)),
+  })
   registerSuiXingDirectory(ctx, centers, bridges, threads)
   ctx.effect(
     () => ctx.locale.register(CENTERS_NS, { zh: centersZh, en: centersEn }),
