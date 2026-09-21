@@ -20,6 +20,8 @@ import { THREAD_VISIBLE_LIMIT, liveThreads, threadRows } from '../src/client/thr
 import {
   THREADS_PERSIST_NAME, createThreadsService, type ThreadsService,
 } from '../src/client/threads/store.ts'
+import { presetFor } from '../src/client/presets/spec.ts'
+import { createRolePresets, type RolePresets } from '../src/client/presets/index.ts'
 
 afterEach(() => {
   // The store persists on purpose, and jsdom shares one storage per file.
@@ -257,5 +259,71 @@ describe('capability conversations — the launcher', () => {
       )
     })
     warn.mockRestore()
+  })
+
+  it('hands the brand-new conversation to its capability role', async () => {
+    const subject = bench()
+    const assign = vi.fn()
+    const threads = createThreadsService()
+    createThreadLauncher(subject.ctx, threads, { assign } satisfies RolePresets)
+      .start('chief')
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('chief', 'session-from-workspace')
+    })
+    // The binding — the sidebar's own note — is unchanged by the role.
+    expect(bindings(threads)).toEqual([['chief', 'session-from-workspace']])
+  })
+
+  it('starts a conversation even when the role binder throws', async () => {
+    const subject = bench()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const threads = createThreadsService()
+    createThreadLauncher(subject.ctx, threads, {
+      assign: () => { throw new Error('remote gone') },
+    }).start('chief')
+    await vi.waitFor(() => {
+      expect(subject.openWorkspace).toHaveBeenCalled()
+    })
+    // Work began; the role is presentation, never a precondition.
+    expect(bindings(threads)).toEqual([['chief', 'session-from-workspace']])
+    warn.mockRestore()
+  })
+})
+
+describe('capability roles — the preset mapping and binder', () => {
+  it('maps a capability that speaks in role to the preset the deployment ships', () => {
+    expect(presetFor('chief')).toBe('suixing-chief')
+  })
+
+  it('leaves a capability without a role on the default composition', () => {
+    expect(presetFor('report')).toBeUndefined()
+  })
+
+  it('is absent in a build without the presets remote', () => {
+    // The cradle has no `remote` service; touching it must not throw.
+    expect(createRolePresets(new Context())).toBeUndefined()
+  })
+
+  it('selects the preset for a role capability and skips the rest', () => {
+    const select = vi.fn(async () => ({ ok: true as const, value: 'suixing-chief' }))
+    const ctx = new Context()
+    ctx.provide('remote', { agentPresets: { select } })
+    const roles = createRolePresets(ctx)
+    expect(roles).toBeDefined()
+    roles?.assign('brand', 's1')
+    expect(select).not.toHaveBeenCalled()
+    roles?.assign('chief', 's2')
+    expect(select).toHaveBeenCalledWith('s2', 'suixing-chief')
+  })
+
+  it('keeps the conversation when the Host refuses the swap', async () => {
+    const select = vi.fn(async () => {
+      throw new Error('agent-preset/locked')
+    })
+    const ctx = new Context()
+    ctx.provide('remote', { agentPresets: { select } })
+    const roles = createRolePresets(ctx)
+    expect(() => roles?.assign('chief', 's1')).not.toThrow()
+    await vi.waitFor(() => { expect(select).toHaveBeenCalled() })
   })
 })

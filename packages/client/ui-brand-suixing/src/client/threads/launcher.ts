@@ -8,10 +8,19 @@
  * lets the sidebar nest it under that capability instead of losing it in a
  * list of every conversation in the workspace.
  *
- * Nothing here narrates capability instructions into the conversation. The
- * Session runs the preset the deployment is configured for; a capability's
- * own prompt reaches a conversation the same way it reaches any other — as
- * something the user says, or references with `@`.
+ * The conversation itself stays an ordinary Session: the Host creates it, the
+ * Session Controller lists it, the conversation panel renders it, and the
+ * workspace browser keeps showing it exactly as it shows any other. This
+ * module only decides *where* it is born and remembers *who* asked for it —
+ * which is what lets the sidebar nest it under that capability instead of
+ * losing it in a list of every conversation in the workspace.
+ *
+ * Role is the Host's own concept too: a capability that speaks in role maps
+ * to an agent preset (`presets/spec.ts`), and the binding below hands the
+ * just-created blank Session to `agentPresets.select` — the same native path
+ * the new-session chip uses. The conversation never gets narrated capability
+ * instructions by this module; a capability without a preset runs the
+ * deployment's default composition, exactly as before.
  */
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces, WorkspaceId } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -19,6 +28,7 @@ import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ThreadsService } from './store.ts'
+import type { RolePresets } from '../presets/index.ts'
 
 /** Starting and returning to a capability's conversations. */
 export interface ThreadLauncher {
@@ -65,10 +75,17 @@ export function threadServices(ctx: ClientContext): ThreadServices | undefined {
  * Create the launcher.
  * @param ctx - client root context.
  * @param threads - the binding store the new conversation is recorded in.
+ * @param rolePresets - the capability→preset binder; absent (a build without
+ *   the presets remote, or callers that skip it) conversations open on the
+ *   deployment's default composition, exactly as they did before.
  * @returns the launcher; with the session services absent it reports itself
  *   unavailable and both actions are inert.
  */
-export function createThreadLauncher(ctx: ClientContext, threads: ThreadsService): ThreadLauncher {
+export function createThreadLauncher(
+  ctx: ClientContext,
+  threads: ThreadsService,
+  rolePresets?: RolePresets,
+): ThreadLauncher {
   const services = threadServices(ctx)
   if (services === undefined) {
     return { available: false, start: () => {}, open: () => {} }
@@ -94,10 +111,14 @@ export function createThreadLauncher(ctx: ClientContext, threads: ThreadsService
     if (target === undefined) {
       const sessionId = await sessions.create({})
       threads.bind(capabilityId, sessionId)
+      rolePresets?.assign(capabilityId, sessionId)
       uiWorkspace.openSession(sessionId)
       return
     }
-    await uiWorkspace.openWorkspace(target, (sessionId) => { threads.bind(capabilityId, sessionId) })
+    await uiWorkspace.openWorkspace(target, (sessionId) => {
+      threads.bind(capabilityId, sessionId)
+      rolePresets?.assign(capabilityId, sessionId)
+    })
   }
 
   /**

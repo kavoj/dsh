@@ -68,8 +68,10 @@ export {
   type OutputKind, type WorkflowDraft, type WorkflowSpec,
 } from './centers/spec.ts'
 export { capabilityRows, localCapabilities } from './directory/capabilities.ts'
+export { CAPABILITY_PRESETS, presetFor } from './presets/spec.ts'
 export { THREAD_VISIBLE_LIMIT, liveThreads, threadRows } from './threads/spec.ts'
 export { THREADS_PERSIST_NAME, createThreadsService } from './threads/store.ts'
+export type { RolePresets } from './presets/index.ts'
 export {
   REFERENCE_LIMIT, REF_PREFIX, clipboardTextOf, matchReferences, parseReference, referenceOf,
   serializeReference, serializeUnresolved, toReference,

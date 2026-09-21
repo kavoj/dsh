@@ -36,6 +36,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { BridgesService } from '../bridges/store.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { registerSuiXingReferences } from '../references/index.ts'
+import { createRolePresets } from '../presets/index.ts'
 import { createThreadLauncher } from '../threads/launcher.ts'
 import { threadRows, type ThreadSummary } from '../threads/spec.ts'
 import type { ThreadsService } from '../threads/store.ts'
@@ -146,7 +147,7 @@ export function registerSuiXingDirectory(
   )
   const t = ctx.locale.bind(DIRECTORY_NS)
   const focus = createDirectoryFocus()
-  const launcher = createThreadLauncher(ctx, threads)
+  const launcher = createThreadLauncher(ctx, threads, createRolePresets(ctx))
   // One navigation, two writers: the sidebar entry and the card both say "show
   // this capability", and the panel that renders it is the menu's own.
   const openEntry = (panelId: MainPanelId, entryId: string): void => {
