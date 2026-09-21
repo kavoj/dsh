@@ -21,6 +21,7 @@ import {
   THREADS_PERSIST_NAME, createThreadsService, type ThreadsService,
 } from '../src/client/threads/store.ts'
 import { presetFor } from '../src/client/presets/spec.ts'
+import { AGENT_IDS } from '../src/client/directory/specs.ts'
 import { createRolePresets, type RolePresets } from '../src/client/presets/index.ts'
 
 afterEach(() => {
@@ -295,6 +296,12 @@ describe('capability roles — the preset mapping and binder', () => {
     expect(presetFor('chief')).toBe('suixing-chief')
   })
 
+  it('gives every AI-staff agent a role, so the division answers in character', () => {
+    for (const id of AGENT_IDS) {
+      expect(presetFor(id), id).toMatch(/^suixing-/)
+    }
+  })
+
   it('leaves a capability without a role on the default composition', () => {
     expect(presetFor('report')).toBeUndefined()
   })
@@ -310,7 +317,8 @@ describe('capability roles — the preset mapping and binder', () => {
     ctx.provide('remote', { agentPresets: { select } })
     const roles = createRolePresets(ctx)
     expect(roles).toBeDefined()
-    roles?.assign('brand', 's1')
+    // A workflow has no role: the preset surface is the AI-staff agents'.
+    roles?.assign('report', 's1')
     expect(select).not.toHaveBeenCalled()
     roles?.assign('chief', 's2')
     expect(select).toHaveBeenCalledWith('s2', 'suixing-chief')

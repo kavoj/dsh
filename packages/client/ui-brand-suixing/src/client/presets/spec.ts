@@ -13,6 +13,14 @@
 /** Capability id → agent preset id, for capabilities that speak in role. */
 export const CAPABILITY_PRESETS: Readonly<Record<string, string>> = {
   chief: 'suixing-chief',
+  brand: 'suixing-brand',
+  legal: 'suixing-legal',
+  assistant: 'suixing-assistant',
+  copy: 'suixing-copy',
+  people: 'suixing-people',
+  videoIp: 'suixing-videoip',
+  eastern: 'suixing-eastern',
+  sales: 'suixing-sales',
 }
 
 /**
