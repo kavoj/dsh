@@ -3,6 +3,7 @@
 import type { Plugin } from 'vite'
 import {
   applySuixingDocumentIcon,
+  applySuixingDocumentTitle,
   readSuixingLogo,
   suixingWebAppManifest,
 } from '../../scripts/suixing-brand-assets.ts'
@@ -27,7 +28,8 @@ export function suixingBrandAssets(repositoryRoot: string): Plugin {
     name: 'dsh-suixing-brand-assets',
     apply: 'build',
     transformIndexHtml(html) {
-      return applySuixingDocumentIcon(html, process.env.DSH_CLIENT_BUILD_PROFILE)
+      const profile = process.env.DSH_CLIENT_BUILD_PROFILE
+      return applySuixingDocumentTitle(applySuixingDocumentIcon(html, profile), profile)
     },
     generateBundle() {
       if (process.env.DSH_CLIENT_BUILD_PROFILE !== 'suixing') return

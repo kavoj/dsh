@@ -8,6 +8,7 @@ import {
   SUIXING_LOGO_REPOSITORY_PATH,
   SUIXING_LOGO_VECTOR_PATH,
   applySuixingDocumentIcon,
+  applySuixingDocumentTitle,
   readSuixingLogo,
   suixingWebAppManifest,
 } from './suixing-brand-assets.ts'
@@ -49,6 +50,20 @@ describe('suixing brand assets', () => {
   it('matches the real apps/web/index.html shell', () => {
     const shell = readFileSync(resolve(root, 'apps/web/index.html'), 'utf8')
     expect(applySuixingDocumentIcon(shell, 'suixing')).toContain(SUIXING_FAVICON_LINK)
+    expect(applySuixingDocumentTitle(shell, 'suixing')).toContain('<title>SuiXing</title>')
+    expect(applySuixingDocumentTitle(shell, 'suixing'))
+      .not.toContain('DSH Local Build')
+  })
+
+  it('replaces the document title only for suixing builds', () => {
+    const html = '<head><title>DSH Local Build</title></head>'
+    expect(applySuixingDocumentTitle(html, 'suixing'))
+      .toBe('<head><title>SuiXing</title></head>')
+    for (const profile of [undefined, 'official', 'local']) {
+      expect(applySuixingDocumentTitle(html, profile)).toBe(html)
+    }
+    expect(() => applySuixingDocumentTitle('<head></head>', 'suixing'))
+      .toThrow(/missing the document title element/)
   })
 
   it('leaves every other profile untouched', () => {

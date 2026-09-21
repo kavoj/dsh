@@ -21,6 +21,22 @@ export const DEFAULT_FAVICON_HREF = '/favicon.svg'
 /** Icon link that replaces the default one in SuiXing builds. */
 export const SUIXING_FAVICON_LINK = `<link rel="icon" type="image/png" href="${SUIXING_LOGO_PUBLIC_PATH}" />`
 
+/** Title emitted by apps/web/index.html for the default distribution. */
+export const DEFAULT_DOCUMENT_TITLE = 'DSH Local Build'
+
+/** Title that replaces the default one in SuiXing builds. */
+export const SUIXING_DOCUMENT_TITLE = 'SuiXing'
+
+/** SuiXing title element substituted for the default one. */
+const SUIXING_TITLE_ELEMENT = `<title>${SUIXING_DOCUMENT_TITLE}</title>`
+
+/**
+ * Vite serializes the parsed index.html before post transforms run, so the
+ * title element's inner whitespace is not stable. Match the element by its
+ * shape instead of exact text.
+ */
+const TITLE_ELEMENT_PATTERN = /<title>[^<]*<\/title>/
+
 /**
  * Vite serializes the parsed index.html before post transforms run, so the
  * self-closing slash and attribute spacing of the source link are not
@@ -64,6 +80,22 @@ export function applySuixingDocumentIcon(html: string, buildProfile: string | un
     throw new Error('suixing brand: index.html is missing the default favicon link')
   }
   return html.replace(pattern, SUIXING_FAVICON_LINK)
+}
+
+/**
+ * Rewrite the document title for a SuiXing build, leaving every other
+ * profile's HTML untouched.
+ * @param html - the transformed index.html source.
+ * @param buildProfile - value of DSH_CLIENT_BUILD_PROFILE for this build.
+ * @returns HTML with the SuiXing title element when building SuiXing.
+ */
+export function applySuixingDocumentTitle(html: string, buildProfile: string | undefined): string {
+  if (buildProfile !== 'suixing') return html
+  const pattern = new RegExp(TITLE_ELEMENT_PATTERN.source)
+  if (!pattern.test(html)) {
+    throw new Error('suixing brand: index.html is missing the document title element')
+  }
+  return html.replace(pattern, SUIXING_TITLE_ELEMENT)
 }
 
 /**
