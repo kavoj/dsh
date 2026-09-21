@@ -271,9 +271,31 @@ describe('SuiXing capability directory — the page', () => {
     render(<DirectoryPage group={AGENTS} t={zhT} />)
     expect(screen.getByText('总裁决策官')).toBeTruthy()
     expect(screen.getByText('把眼前的难题，理成下一步。')).toBeTruthy()
-    expect(screen.getAllByText('用途说明')).toHaveLength(9)
-    expect(screen.getByText('找到增长卡点；比较一个重要决策；梳理未来90天重点。')).toBeTruthy()
-    expect(screen.getByText('可以先说业务现状和目标；经营报表有就补充，没有也能开始。')).toBeTruthy()
+    // 总裁决策官's card keeps one row — its self-introduction; the other eight
+    // keep the agent template's purpose row.
+    expect(screen.getAllByText('用途说明')).toHaveLength(8)
+    expect(screen.getByText('自我介绍')).toBeTruthy()
+    expect(screen.getByText(/我是总裁决策官，AI参谋部的首席角色/)).toBeTruthy()
+  })
+
+  it('introduces 总裁决策官 in full: what it solves, how to use it, what it refuses', () => {
+    render(<DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook('chief')} />)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('总裁决策官')
+    // The introduction and the hand-over read as quotations.
+    expect(screen.getByText(/我是总裁决策官，AI参谋部的首席角色/)).toBeTruthy()
+    expect(screen.getByText(/把背景和诉求直接丢给我/)).toBeTruthy()
+    for (const term of ['我能解决', '怎么用', '我能做的', '我不会做的', '决策思维课（跟着学）']) {
+      expect(screen.getByText(term)).toBeTruthy()
+    }
+    // Four named problems; the do-list as chips.
+    expect(screen.getByText('问题太模糊，不知道从哪下手')).toBeTruthy()
+    expect(screen.getByText('会开了很久，最后没人拍板。')).toBeTruthy()
+    expect(screen.getByText('拆问题')).toBeTruthy()
+    expect(screen.getByText('出决策清单。')).toBeTruthy()
+    // The refusals name their three limits, the lesson names its tools.
+    expect(screen.getByText('替你拍板——最终决定权永远在你')).toBeTruthy()
+    expect(screen.getByText('代替法务与财务的专业意见——我只做经营视角的拆解。')).toBeTruthy()
+    expect(screen.getByText('可逆性分级——可逆的决定快做，不可逆的决定慢做。')).toBeTruthy()
   })
 
   it('shows a workflow scenario with its own definition rows', () => {

@@ -133,6 +133,31 @@ function FieldBlock({ field, t }: { field: CapabilityField; t: CapabilityDetailP
   if (field.termKey === 'field.firstQuestion') {
     return <Section title={title}><p className={css.quote}>{value}</p></Section>
   }
+  // 总裁决策官's self-introduction: who it is and how to hand work over read
+  // as quotations; the problems, refusals, and thinking tools read as lists;
+  // the two do-lists read as chips.
+  if (field.termKey === 'field.intro' || field.termKey === 'field.howto') {
+    return <Section title={title}><p className={css.quote}>{value}</p></Section>
+  }
+  if (field.termKey === 'field.problems' || field.termKey === 'field.boundary'
+    || field.termKey === 'field.mindset') {
+    return (
+      <Section title={title}>
+        <ul className={css.bullets}>
+          {items(value).map(item => <li key={item} className={css.bullet}>{item}</li>)}
+        </ul>
+      </Section>
+    )
+  }
+  if (field.termKey === 'field.cando') {
+    return (
+      <Section title={title}>
+        <ul className={css.chips}>
+          {items(value).map(item => <li key={item} className={css.chip}>{item}</li>)}
+        </ul>
+      </Section>
+    )
+  }
   return <Section title={title}><p className={css.text}>{value}</p></Section>
 }
 

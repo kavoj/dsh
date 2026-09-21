@@ -32,6 +32,11 @@ export interface CapabilitySpec {
   readonly hintKey: SuiXingDirectoryKey
   /** The definition rows the directory shows for this capability. */
   readonly fields: readonly CapabilityField[]
+  /**
+   * The rows the menu's list card shows, when the full definition is too much
+   * for a card. Absent means the card shows every field.
+   */
+  readonly card?: readonly CapabilityField[]
 }
 
 /** One collapsible business menu plus the panel its directory opens. */
@@ -132,6 +137,30 @@ function agent(id: AgentId): CapabilitySpec {
 }
 
 /**
+ * 总裁决策官 renders the approved self-introduction instead of the agent
+ * template: the lead role speaks for itself on its page — who it is, which
+ * problems it takes, how to hand one over, what it does and refuses to do,
+ * and the decision thinking it teaches as it goes (老谢 2026-09-21).
+ */
+const CHIEF: CapabilitySpec = {
+  id: 'chief',
+  labelKey: 'entry.chief',
+  hintKey: 'entry.chief.hint',
+  fields: [
+    { termKey: 'field.intro', valueKey: 'entry.chief.intro' },
+    { termKey: 'field.problems', valueKey: 'entry.chief.problems' },
+    { termKey: 'field.howto', valueKey: 'entry.chief.howto' },
+    { termKey: 'field.cando', valueKey: 'entry.chief.cando' },
+    { termKey: 'field.boundary', valueKey: 'entry.chief.boundary' },
+    { termKey: 'field.mindset', valueKey: 'entry.chief.mindset' },
+  ],
+  // The menu card keeps one row: the self-introduction carries the pitch.
+  card: [
+    { termKey: 'field.intro', valueKey: 'entry.chief.intro' },
+  ],
+}
+
+/**
  * Build one 创作中心 capability from its identity.
  * The creator-confirmation shape reuses `purpose`/`tasks`/`material` and adds
  * `firstQuestion` (the prototype's 第一轮追问) and `confirmItems` (初步确认项).
@@ -204,7 +233,8 @@ export const DIRECTORY_GROUPS: readonly DirectoryGroupSpec[] = [
     manageable: true,
     // Plan §2: nine agents, one menu. The four creation tools used to share
     // this list; they now own 创作中心, so each menu names one kind of work.
-    entries: AGENT_IDS.map(agent),
+    // 总裁决策官 carries its own richer detail page (see CHIEF above).
+    entries: AGENT_IDS.map(id => (id === 'chief' ? CHIEF : agent(id))),
   },
   {
     id: 'suixing.automation',

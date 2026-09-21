@@ -200,7 +200,7 @@ export function DirectoryPage({
             </div>
             <p className={css.cardLead}>{t(capability.hintKey)}</p>
             <dl className={css.fields}>
-              {capability.fields.map(field => (
+              {(capability.card ?? capability.fields).map(field => (
                 <div key={field.termKey} className={css.field}>
                   <dt className={css.term}>{t(field.termKey)}</dt>
                   <dd className={css.value}>{t(field.valueKey)}</dd>

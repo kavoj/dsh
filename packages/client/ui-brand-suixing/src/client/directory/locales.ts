@@ -49,6 +49,12 @@ export const directoryZh = {
   'field.result': '预计结果',
   'field.steps': '页面步骤',
   'field.note': '关键提示',
+  'field.intro': '自我介绍',
+  'field.problems': '我能解决',
+  'field.howto': '怎么用',
+  'field.cando': '我能做的',
+  'field.boundary': '我不会做的',
+  'field.mindset': '决策思维课（跟着学）',
 
   // The capability page (2026-09-20): what a card opens. The socket block is
   // 创作中心's own fact — the address the capability resolves to and the rung
@@ -79,6 +85,12 @@ export const directoryZh = {
   'entry.chief.purpose': '陪你梳理增长、利润和重要选择。先说一件最想解决的事，我会逐步补问，再整理成行动建议。',
   'entry.chief.tasks': '找到增长卡点；比较一个重要决策；梳理未来90天重点。',
   'entry.chief.material': '可以先说业务现状和目标；经营报表有就补充，没有也能开始。',
+  'entry.chief.intro': '我是总裁决策官，AI参谋部的首席角色——专门把「说不清、拿不准、难下手」的复杂问题，拆成一份能直接拍板的决策清单。',
+  'entry.chief.problems': '问题太模糊，不知道从哪下手；多个选项各有优劣，缺统一比较口径；有想法但没算清风险、成本、回收周期；会开了很久，最后没人拍板。',
+  'entry.chief.howto': '把背景和诉求直接丢给我。我会先列出「已识别」的关键信息，再针对缺口做结构化反问，最后输出：事实 / 目标 / 选项 / 约束 / 风险 / 下一步行动。',
+  'entry.chief.cando': '拆问题；列选项；算账；排优先级；出决策清单。',
+  'entry.chief.boundary': '替你拍板——最终决定权永远在你；编造数据——算不清的就说算不清；代替法务与财务的专业意见——我只做经营视角的拆解。',
+  'entry.chief.mindset': '对话里我用到的每个思维工具都会顺手讲清，随时可以追问着学：期望值思维——拿概率和代价算账，不赌感觉；第二层思维——每个决定多问一句「然后呢」；10-10-10——这个决定，10天后、10个月后、10年后分别怎么看；倒推法——从终局目标倒推现在这一步；机会成本——选了它，放弃的是什么；可逆性分级——可逆的决定快做，不可逆的决定慢做。',
   'entry.brand': '品牌战略定位官',
   'entry.brand.hint': '让客户记得住，也说得清。',
   'entry.brand.purpose': '从客户、产品与差异出发，梳理品牌定位、核心卖点和对外表达。',
@@ -221,6 +233,12 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'field.result': 'Expected result',
   'field.steps': 'Page steps',
   'field.note': 'Key reminder',
+  'field.intro': 'Introduction',
+  'field.problems': 'Problems I solve',
+  'field.howto': 'How to use me',
+  'field.cando': 'What I can do',
+  'field.boundary': 'What I will not do',
+  'field.mindset': 'Decision thinking, taught as we go',
 
   // The capability page (2026-09-20): what a card opens. The socket block is
   // 创作中心's own fact — the address the capability resolves to and the rung
@@ -250,6 +268,12 @@ export const directoryEn: Record<SuiXingDirectoryKey, string> = {
   'entry.chief.purpose': 'Think through growth, margin, and the decisions that matter. Say the one thing you most want to solve; I ask a few questions, then lay out an action plan.',
   'entry.chief.tasks': 'Find the growth blocker; compare one important decision; lay out the next 90 days.',
   'entry.chief.material': 'Business status and goals are enough to start; add operating reports if you have them.',
+  'entry.chief.intro': 'I am the Chief Decision Officer, the lead role of the AI staff division — I take problems that are vague, uncertain, or hard to start, and turn them into a decision list you can act on.',
+  'entry.chief.problems': 'The problem is too vague to know where to start; options each look fine, with no shared yardstick; a hunch without the risk, cost, or payback worked out; a meeting that runs long and ends with no one deciding.',
+  'entry.chief.howto': 'Drop the background and what you want in front of me. I list what I have identified, ask structured questions about the gaps, then deliver: facts / goals / options / constraints / risks / next steps.',
+  'entry.chief.cando': 'Break down the problem; lay out options; run the numbers; rank priorities; write the decision list.',
+  'entry.chief.boundary': 'Decide for you — the call stays yours; invent numbers — what cannot be computed, I say so; replace legal or finance — I unpack from the operating view only.',
+  'entry.chief.mindset': 'Every thinking tool I use, I name and explain on the spot — ask and I will teach it: expected value — weigh probability and cost, not gut feel; second-order thinking — ask "and then what" one more time; 10-10-10 — how the call looks in 10 days, 10 months, 10 years; working backwards — from the end goal to this step; opportunity cost — choosing it means giving up what; reversibility — reversible calls fast, irreversible calls slow.',
   'entry.brand': 'Brand Positioning Officer',
   'entry.brand.hint': 'Make the brand memorable and easy to explain.',
   'entry.brand.purpose': 'Start from customers, products, and differences, then work out the positioning, the core selling points, and the outward message.',
