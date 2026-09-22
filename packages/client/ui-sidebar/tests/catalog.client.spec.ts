@@ -168,6 +168,39 @@ describe('sidebar catalog registry', () => {
     catalog.dispose()
   })
 
+  it('lets the user drag an order, which then outranks recency', () => {
+    const e1 = entry('e1')
+    const e2 = entry('e2')
+    const e3 = entry('e3')
+    const e4 = entry('e4')
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', [e1, e2, e3, e4]))
+    catalog.activate(e4)
+    catalog.activate(e1)
+    // Dragging pins the sequence the user made…
+    catalog.reorderEntries('a', ['e4', 'e2', 'e1', 'e3'])
+    expect(catalog.getSnapshot().groups[0]?.ordered).toEqual(['e4', 'e2', 'e1', 'e3'])
+    // …and a later visit no longer shuffles it back.
+    catalog.activate(e2)
+    expect(catalog.getSnapshot().groups[0]?.visible.map(entry => entry.id))
+      .toEqual(['e4', 'e2', 'e1', 'e3'])
+    catalog.dispose()
+  })
+
+  it('keeps a dragged order workable as the group roster changes', () => {
+    const entries = ['e1', 'e2', 'e3'].map(id => entry(id))
+    const catalog = createSidebarCatalog(vi.fn())
+    catalog.register(group('a', entries))
+    catalog.reorderEntries('a', ['e3', 'e2', 'gone'])
+    // An id the group stopped declaring is skipped, not fatal…
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id)).toEqual(['e3', 'e2', 'e1'])
+    // …and an entry the group gains follows in declared order.
+    catalog.register(group('a', [...entries, entry('e9')]))
+    expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
+      .toEqual(['e3', 'e2', 'e1', 'e9'])
+    catalog.dispose()
+  })
+
   it('dispatches a panel target through the injected selector and a command target directly', () => {
     const selectPanel = vi.fn()
     const run = vi.fn()

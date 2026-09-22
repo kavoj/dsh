@@ -135,6 +135,12 @@ export interface CatalogGroupView {
   readonly group: CatalogGroup
   /** Entries to render: recent first, capped, or the declared head on first run. */
   readonly visible: readonly CatalogEntry[]
+  /**
+   * Every entry id in the order this browser shows them — the full sequence
+   * the visible slice is cut from. A centre's page reads it to display the
+   * same arrangement its sidebar does and to drag against.
+   */
+  readonly ordered: readonly string[]
   /** Declared entry count, for the "view all" label. */
   readonly total: number
   /** Whether the group is unfolded. */
@@ -225,6 +231,14 @@ export interface ISidebarCatalog extends ObservableSnapshot<CatalogSnapshot> {
    * @returns the generated group id.
    */
   createGroup(title: string): string
+  /**
+   * Record the entry order the user dragged for one group. The saved sequence
+   * replaces recency as that group's arrangement; ids the group stops
+   * declaring are skipped, and entries it gains follow in declared order.
+   * @param groupId - registered group id.
+   * @param entryIds - the full entry sequence, in the user's order.
+   */
+  reorderEntries(groupId: string, entryIds: readonly string[]): void
   /** Re-run the registrant's retry action, when one is installed. */
   retry(): void
   /** Release every subscription this service installed. */
@@ -255,6 +269,14 @@ interface CatalogProgress {
   removed: readonly string[]
   /** Groups the user added, in creation order. */
   created: readonly CatalogCustomGroup[]
+  /**
+   * Group id → the entry order the user dragged, as entry ids. An order the
+   * user set is authoritative: recency stops re-sorting that group, so the
+   * arrangement they made in the centre's page is the arrangement the sidebar
+   * shows. Ids the group no longer declares are ignored; undeclared entries
+   * follow in declared order.
+   */
+  ordered: Record<string, readonly string[]>
 }
 
 /** A registration plus its arrival sequence, for stable ordering. */
@@ -274,7 +296,7 @@ export function createSidebarCatalog(
   const registrations = new Map<string, CatalogRegistration>()
   const order = createSnapshotStore<readonly CatalogRegistration[]>([])
   const progress = createSnapshotStore<CatalogProgress>(
-    { expanded: null, recent: [], renamed: {}, removed: [], created: [] },
+    { expanded: null, recent: [], renamed: {}, removed: [], created: [], ordered: {} },
     { persist: { name: 'dsh.sidebar.catalog' } },
   )
   /** Status and retry live off the persisted slice: a callback cannot serialize. */
@@ -337,16 +359,23 @@ export function createSidebarCatalog(
 
   const view = (group: CatalogGroup, unfolded: readonly string[]): CatalogGroupView => {
     const entries = new Map(group.entries.map(entry => [entry.id, entry]))
-    const recent = progress.getSnapshot().recent
-      .flatMap(id => entries.get(id) ?? [])
+    const { recent, ordered } = progress.getSnapshot()
+    const saved = ordered[group.id]
+    // The arrangement this group shows. Without a dragged order the recently
+    // used entries float to the top and the declared head fills the rest, so
+    // using one capability does not hide the ones nobody has opened yet (a
+    // recency-only list would render a nine-agent centre as one row). With
+    // one, the user's sequence is authoritative — recency stops re-sorting,
+    // because an arrangement the user made must not shuffle itself back.
+    const arranged = saved === undefined
+      ? [...new Map([...recent.flatMap(id => entries.get(id) ?? []), ...group.entries]
+        .map(entry => [entry.id, entry])).values()]
+      : [...new Set(saved)].flatMap(id => entries.get(id) ?? [])
+        .concat(group.entries.filter(entry => !saved.includes(entry.id)))
     return {
       group,
-      // Recency first, but never a replacement: the recently used entries
-      // float to the top and the declared head fills the rest, so using one
-      // capability does not hide the ones nobody has opened yet (a recency
-      // -only list would render a nine-agent centre as one row).
-      visible: [...new Map([...recent, ...group.entries]
-        .map(entry => [entry.id, entry])).values()].slice(0, CATALOG_VISIBLE_LIMIT),
+      visible: arranged.slice(0, CATALOG_VISIBLE_LIMIT),
+      ordered: arranged.map(entry => entry.id),
       total: group.entries.length,
       expanded: unfolded.includes(group.id),
     }
@@ -459,6 +488,11 @@ export function createSidebarCatalog(
         draft.created = [...draft.created, { id, title }]
       })
       return id
+    },
+    reorderEntries: (groupId, entryIds) => {
+      progress.update((draft) => {
+        draft.ordered = { ...draft.ordered, [groupId]: [...entryIds] }
+      })
     },
     retry: () => { retryAction?.() },
     dispose: () => {

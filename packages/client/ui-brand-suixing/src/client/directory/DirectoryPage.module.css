@@ -241,3 +241,77 @@
     gap: 0;
   }
 }
+
+/* The page's own agent form and the drag arrangement. */
+
+.addBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.addBtn:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.orderHint {
+  margin: 0 0 4px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.cardDragging {
+  opacity: 0.5;
+  outline: 1px dashed var(--dsw-alias-border-brand);
+}
+
+li[draggable="true"] {
+  cursor: grab;
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.addField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.addFieldLabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.addFieldInput,
+.addFieldArea {
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  resize: vertical;
+}
+
+.addFieldInput:focus-visible,
+.addFieldArea:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-border-brand);
+}

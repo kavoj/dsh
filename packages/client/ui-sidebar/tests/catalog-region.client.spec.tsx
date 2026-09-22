@@ -36,11 +36,12 @@ const BASE_GROUP = { id: 'a', title: 'Alpha center', entries: ENTRIES }
 
 /** Build one group view; rows and the total follow the group unless overridden. */
 function view({
-  group = BASE_GROUP, visible, total, expanded = true,
+  group = BASE_GROUP, visible, ordered, total, expanded = true,
 }: Partial<CatalogGroupView> = {}): CatalogGroupView {
   return {
     group,
     visible: visible ?? group.entries,
+    ordered: ordered ?? group.entries.map(entry => entry.id),
     total: total ?? group.entries.length,
     expanded,
   }

@@ -34,6 +34,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { BridgesService } from '../bridges/store.ts'
+import type { AgentDraft } from '../centers/spec.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { registerSuiXingReferences } from '../references/index.ts'
 import { createRolePresets } from '../presets/index.ts'
@@ -254,11 +255,18 @@ export function registerSuiXingDirectory(
       inject: () => ({
         group,
         hooks: BRIDGED_PANELS.has(group.panelId)
-          ? { centers, bridges, focus }
-          : { centers, focus },
+          ? { centers, bridges, focus, catalog: ctx.sidebarCatalog }
+          : { centers, focus, catalog: ctx.sidebarCatalog },
         focusCapability: (id: string) => { focus.focus(id) },
         clearFocus: () => { focus.clear() },
         startCapability: (id: string) => { startCapability(id) },
+        // The page's own add form stores through the same service Settings
+        // uses, and its drags persist through the same catalog the sidebar
+        // renders from: one fact, three surfaces, no sync.
+        addAgent: (draft: AgentDraft) => { centers.addAgent(draft) },
+        reorderEntries: (entryIds: readonly string[]) => {
+          ctx.sidebarCatalog.reorderEntries(group.id, entryIds)
+        },
       }),
     }, DirectoryPage))
   }

@@ -87,6 +87,10 @@ function CatalogGroupSection({
 }) {
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  // Whether the resting list shows past its budget. A centre can outgrow the
+  // visible slice once the user adds capabilities to it; the expander below
+  // keeps the remainder one click away instead of a jump to the full page.
+  const [showAll, setShowAll] = useState(false)
   const matches = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (needle === '') return undefined
@@ -97,8 +101,16 @@ function CatalogGroupSection({
       || (entry.children ?? []).some(child => child.label.toLowerCase().includes(needle)))
   }, [query, view.group.entries])
   // A search reflects what it matched; the resting list stays on the shell's
-  // recency budget so the region never becomes a wall of rows.
-  const rows = (matches ?? view.visible).slice(0, CATALOG_VISIBLE_LIMIT)
+  // recency budget so the region never becomes a wall of rows — unless the
+  // user expanded it, which is their call to keep until they collapse.
+  const rows = matches !== undefined
+    ? matches.slice(0, CATALOG_VISIBLE_LIMIT)
+    : showAll ? view.group.entries : view.visible
+  // The remainder the expander names, and only while the list is at rest: a
+  // live search is already the whole subject, and an expanded list has none.
+  const hiddenCount = matches === undefined && !showAll
+    ? view.group.entries.length - rows.length
+    : 0
   const allPanel = view.group.allPanel
   // The jump belongs to the group's directory rather than to the slice on
   // screen, so a group that names a panel keeps its door open even when its
@@ -204,6 +216,24 @@ function CatalogGroupSection({
           <p className={css.noticeHint}>{t('catalog.search.empty')}</p>
         )}
         {empty && <p className={css.noticeHint}>{t('catalog.group.empty')}</p>}
+        {hiddenCount > 0 && (
+          <button
+            type="button"
+            className={css.viewAll}
+            onClick={() => { setShowAll(true) }}
+          >
+            {t('catalog.expand', { count: hiddenCount })}
+          </button>
+        )}
+        {showAll && matches === undefined && view.group.entries.length > CATALOG_VISIBLE_LIMIT && (
+          <button
+            type="button"
+            className={css.viewAll}
+            onClick={() => { setShowAll(false) }}
+          >
+            {t('catalog.collapse')}
+          </button>
+        )}
         {viewAllPanel !== undefined && (
           <button
             type="button"

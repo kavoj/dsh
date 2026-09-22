@@ -21,13 +21,18 @@
 import { useMemo, useState } from 'react'
 import type { PropsLocale, Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
+import type { CatalogSnapshot } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { Button, IconPlusOutline16, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { bridge, bridgeStatus, bridgeUrl, type BridgeConfig } from '../bridges/spec.ts'
 import type { BridgesSnapshot } from '../bridges/store.ts'
+import type { AgentDraft } from '../centers/spec.ts'
 import type { CentersSnapshot } from '../centers/store.ts'
 import { CapabilityDetail, type DetailConnection, type DetailTarget } from './CapabilityDetail.tsx'
 import { localCapabilities } from './capabilities.ts'
 import { DIRECTORY_NS, type SuiXingDirectoryKey } from './locales.ts'
-import { CREATION_PANEL, type CapabilitySpec, type DirectoryGroupSpec } from './specs.ts'
+import {
+  AGENTS_PANEL, CREATION_PANEL, type CapabilitySpec, type DirectoryGroupSpec,
+} from './specs.ts'
 import css from './DirectoryPage.module.css'
 
 /** The namespace-bound translate seat this page reads. */
@@ -51,6 +56,25 @@ const noBridges: SnapshotSelectorHook<BridgesSnapshot> = select => select(NO_BRI
 /** Selector hook over nothing: the stable fallback for `useFocus`. */
 const noFocus: SnapshotSelectorHook<string | null> = select => select(null)
 
+/** Selector hook over nothing: the stable fallback for `useCatalog`. */
+const noCatalog: SnapshotSelectorHook<CatalogSnapshot | null> = select => select(null)
+
+/**
+ * The role prompt a quick-added agent runs on when the user left the field
+ * empty: enough of a spine to hold the conversation together, small enough to
+ * replace wholesale once the user writes the real one in Settings.
+ * @param name - the agent's name.
+ * @param oneLiner - its one-line promise, when the user gave one.
+ * @returns the default role prompt.
+ */
+function defaultRolePrompt(name: string, oneLiner: string): string {
+  return [
+    `你是「${name}」。${oneLiner === '' ? '协助用户把一件事推进到下一步。' : oneLiner + '。'}`,
+    '先确认目标与约束，再给方案；信息不足时先问，不要臆测。',
+    '结论先行，关键判断给出依据；不确定的地方明确标注。',
+  ].join('\n')
+}
+
 /** Composed props the main slot renderer supplies to a directory page. */
 export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   /** The menu this panel is the directory of. */
@@ -61,25 +85,18 @@ export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   readonly useBridges?: SnapshotSelectorHook<BridgesSnapshot> | undefined
   /** Focused-capability hook; absent renders the list only. */
   readonly useFocus?: SnapshotSelectorHook<string | null> | undefined
+  /** Catalog snapshot hook; absent renders the declared order only. */
+  readonly useCatalog?: SnapshotSelectorHook<CatalogSnapshot | null> | undefined
   /** Show one capability in full. */
   readonly focusCapability?: ((id: string) => void) | undefined
   /** Walk back to the list. */
   readonly clearFocus?: (() => void) | undefined
   /** Start work for one capability: a conversation of its own. */
   readonly startCapability?: ((id: string) => void) | undefined
-}
-
-/**
- * Whether one capability matches the search text.
- * @param capability - the capability to test.
- * @param needle - lower-cased search text; empty matches everything.
- * @param t - namespace translate seat used for the localized label and lead.
- * @returns whether the capability stays on screen.
- */
-function matches(capability: CapabilitySpec, needle: string, t: DirectoryTranslate): boolean {
-  if (needle === '') return true
-  return t(capability.labelKey).toLowerCase().includes(needle)
-    || t(capability.hintKey).toLowerCase().includes(needle)
+  /** Store one agent added from this page's own form; absent hides the form. */
+  readonly addAgent?: ((draft: AgentDraft) => void) | undefined
+  /** Persist the entry sequence the user dragged; absent disables dragging. */
+  readonly reorderEntries?: ((entryIds: readonly string[]) => void) | undefined
 }
 
 /**
@@ -109,22 +126,102 @@ function bridgeBadge(
  */
 export function DirectoryPage({
   group, useCenters = noCenters, useBridges = noBridges, useFocus = noFocus,
-  focusCapability, clearFocus, startCapability, t,
+  useCatalog = noCatalog, focusCapability, clearFocus, startCapability,
+  addAgent, reorderEntries, t,
 }: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
   const snapshot = useCenters(state => state)
   const bridges = useBridges(state => state)
   const focusedId = useFocus(state => state)
+  const savedOrder = useCatalog(state => state)
+    ?.groups.find(view => view.group.id === group.id)?.ordered
   // Only 创作中心 carries sockets; every other menu keeps the status badge.
   const showsConnections = group.panelId === CREATION_PANEL
-  const shipped = useMemo(
-    () => group.entries.filter(capability => matches(capability, needle, t)),
-    [group.entries, needle, t],
-  )
-  const locals = localCapabilities(group, snapshot)
-    .filter(row => needle === '' || row.name.toLowerCase().includes(needle)
-      || row.hint.toLowerCase().includes(needle))
+
+  /**
+   * One row of the page's list: a shipped capability or a locally built one.
+   * They share the list so a dragged arrangement can interleave them — the
+   * sidebar's first nine come from this same order.
+   */
+  interface Row {
+    readonly id: string
+    readonly name: string
+    readonly hint: string
+    readonly local: boolean
+    /** The shipped descriptor, when this row is one; locals render leaner. */
+    readonly capability?: CapabilitySpec
+  }
+  const rows = useMemo((): readonly Row[] => {
+    const shipped = group.entries.map<Row>(capability => ({
+      id: capability.id,
+      name: t(capability.labelKey),
+      hint: t(capability.hintKey),
+      local: false,
+      capability,
+    }))
+    const locals = localCapabilities(group, snapshot).map<Row>(local => ({
+      id: local.id, name: local.name, hint: local.hint, local: true,
+    }))
+    const all = [...shipped, ...locals]
+    if (needle !== '') {
+      return all.filter(row => row.name.toLowerCase().includes(needle)
+        || row.hint.toLowerCase().includes(needle))
+    }
+    // The arrangement the user dragged leads; the declared head fills the
+    // rest, so a centre that grew since the drag stays on the list.
+    if (savedOrder === undefined) return all
+    const rest = new Map(all.map(row => [row.id, row]))
+    const head = [...new Set(savedOrder)].flatMap((id) => {
+      const row = rest.get(id)
+      rest.delete(id)
+      return row === undefined ? [] : [row]
+    })
+    return [...head, ...rest.values()]
+  }, [group, snapshot, needle, savedOrder, t])
+
+  // Drag-and-drop reordering: the arrangement commits on drop through the
+  // injected callback, which is the same record the sidebar reads — one fact,
+  // two surfaces. Searching suspends dragging: you reorder the list you see.
+  const [dragId, setDragId] = useState<string | null>(null)
+  const draggable = needle === '' && reorderEntries !== undefined
+  const dropOn = (targetId: string): void => {
+    if (!draggable || dragId === null || dragId === targetId) return
+    const ids = rows.map(row => row.id)
+    ids.splice(ids.indexOf(targetId), 0, ...ids.splice(ids.indexOf(dragId), 1))
+    reorderEntries(ids)
+    setDragId(null)
+  }
+
+  // The page's own add form: name required, the rest optional, one agent per
+  // confirm. It stores through the same service Settings uses, so the new
+  // agent is in the sidebar and this list the moment the modal closes.
+  const canAdd = group.panelId === AGENTS_PANEL && addAgent !== undefined
+  const [addOpen, setAddOpen] = useState(false)
+  const [addDraft, setAddDraft] = useState({ name: '', oneLiner: '', persona: '' })
+  const addBlocked = addDraft.name.trim() === ''
+  const confirmAdd = (): void => {
+    if (!canAdd || addBlocked) return
+    const name = addDraft.name.trim()
+    const oneLiner = addDraft.oneLiner.trim()
+    const persona = addDraft.persona.trim()
+    addAgent({
+      name,
+      oneLiner: oneLiner === '' ? `按「${name}」的角色协助处理日常事务` : oneLiner,
+      role: 'specialist',
+      rolePrompt: persona === '' ? defaultRolePrompt(name, oneLiner) : persona,
+      guardrails: [],
+      tools: [],
+      datasets: [],
+      openingStatement: `我是${name}。说说你手上这件事，我来出方案。`,
+      starters: [],
+      inputs: [],
+      outputContract: '文档',
+      assumptions: ['由「添加智能体」快速创建；角色设定与交付形态可随后在设置中完善'],
+    })
+    setAddOpen(false)
+    setAddDraft({ name: '', oneLiner: '', persona: '' })
+  }
 
   // The focused capability, resolved against both halves of the list: a shipped
   // id opens its definition, a local id opens the record the architect built.
@@ -178,64 +275,109 @@ export function DirectoryPage({
           value={query}
           onChange={(event) => { setQuery(event.target.value) }}
         />
-        <span className={css.count}>{t('page.count', { count: shipped.length + locals.length })}</span>
+        <span className={css.count}>{t('page.count', { count: rows.length })}</span>
+        {canAdd && (
+          <button
+            type="button"
+            className={css.addBtn}
+            onClick={() => { setAddDraft({ name: '', oneLiner: '', persona: '' }); setAddOpen(true) }}
+          >
+            <IconPlusOutline16 />
+            {t('page.add')}
+          </button>
+        )}
       </div>
-      <ul className={css.list}>
-        {shipped.map(capability => (
-          <li key={capability.id} className={css.card}>
-            <div className={css.cardHead}>
-              <h2 className={css.cardName}>{t(capability.labelKey)}</h2>
-              <span className={css.badge}>
-                {(showsConnections ? bridgeBadge(capability, bridges, t) : null)
-                  ?? t('page.status')}
-              </span>
-              <button
-                type="button"
-                className={css.cardOpen}
-                aria-label={t('page.open', { name: t(capability.labelKey) })}
-                onClick={() => { focusCapability?.(capability.id) }}
-              >
-                {t('page.open.label')}
-              </button>
-            </div>
-            <p className={css.cardLead}>{t(capability.hintKey)}</p>
-            <dl className={css.fields}>
-              {(capability.card ?? capability.fields).map(field => (
-                <div key={field.termKey} className={css.field}>
-                  <dt className={css.term}>{t(field.termKey)}</dt>
-                  <dd className={css.value}>{t(field.valueKey)}</dd>
-                </div>
-              ))}
-            </dl>
-          </li>
-        ))}
-      </ul>
-      {shipped.length === 0 && locals.length === 0 && <p className={css.empty}>{t('page.empty')}</p>}
-      {locals.length > 0 && (
-        <section className={css.local}>
-          <h2 className={css.localTitle}>{t('page.local')}</h2>
-          <p className={css.subtitle}>{t('page.local.hint')}</p>
-          <ul className={css.list}>
-            {locals.map(row => (
-              <li key={row.id} className={css.card}>
-                <div className={css.cardHead}>
-                  <h3 className={css.cardName}>{row.name}</h3>
-                  <span className={css.badge}>{t('page.local.badge')}</span>
-                  <button
-                    type="button"
-                    className={css.cardOpen}
-                    aria-label={t('page.open', { name: row.name })}
-                    onClick={() => { focusCapability?.(row.id) }}
-                  >
-                    {t('page.open.label')}
-                  </button>
-                </div>
-                <p className={css.cardLead}>{row.hint}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {reorderEntries !== undefined && draggable && rows.length > 1 && (
+        <p className={css.orderHint}>{t('page.order.hint')}</p>
       )}
+      <ul className={css.list}>
+        {rows.map((row) => {
+          const badge = row.local
+            ? t('page.local.badge')
+            : (showsConnections && row.capability !== undefined
+              ? bridgeBadge(row.capability, bridges, t) ?? t('page.status')
+              : t('page.status'))
+          return (
+            <li
+              key={row.id}
+              className={`${css.card} ${dragId === row.id ? css.cardDragging : ''}`}
+              draggable={draggable}
+              onDragStart={() => { setDragId(row.id) }}
+              onDragOver={(event) => { if (dragId !== null) event.preventDefault() }}
+              onDrop={() => { dropOn(row.id) }}
+              onDragEnd={() => { setDragId(null) }}
+            >
+              <div className={css.cardHead}>
+                <h2 className={css.cardName}>{row.name}</h2>
+                <span className={css.badge}>{badge}</span>
+                <button
+                  type="button"
+                  className={css.cardOpen}
+                  aria-label={t('page.open', { name: row.name })}
+                  onClick={() => { focusCapability?.(row.id) }}
+                >
+                  {t('page.open.label')}
+                </button>
+              </div>
+              <p className={css.cardLead}>{row.hint}</p>
+              {row.capability !== undefined && (
+                <dl className={css.fields}>
+                  {(row.capability.card ?? row.capability.fields).map(field => (
+                    <div key={field.termKey} className={css.field}>
+                      <dt className={css.term}>{t(field.termKey)}</dt>
+                      <dd className={css.value}>{t(field.valueKey)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          )
+        })}
+      </ul>
+      {rows.length === 0 && <p className={css.empty}>{t('page.empty')}</p>}
+      <Modal
+        open={addOpen}
+        onClose={() => { setAddOpen(false) }}
+        closeLabel={t('page.add.cancel')}
+        title={t('page.add.title')}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => { setAddOpen(false) }}>{t('page.add.cancel')}</Button>
+            <Button variant="primary" disabled={addBlocked} onClick={confirmAdd}>{t('page.add.confirm')}</Button>
+          </>
+        )}
+      >
+        <div className={css.addForm}>
+          <label className={css.addField}>
+            <span className={css.addFieldLabel}>{t('page.add.name')}</span>
+            <input
+              className={css.addFieldInput}
+              value={addDraft.name}
+              autoFocus
+              onChange={(event) => { setAddDraft(state => ({ ...state, name: event.target.value })) }}
+            />
+          </label>
+          <label className={css.addField}>
+            <span className={css.addFieldLabel}>{t('page.add.oneLiner')}</span>
+            <input
+              className={css.addFieldInput}
+              value={addDraft.oneLiner}
+              placeholder={t('page.add.oneLiner.hint')}
+              onChange={(event) => { setAddDraft(state => ({ ...state, oneLiner: event.target.value })) }}
+            />
+          </label>
+          <label className={css.addField}>
+            <span className={css.addFieldLabel}>{t('page.add.persona')}</span>
+            <textarea
+              className={css.addFieldArea}
+              rows={5}
+              value={addDraft.persona}
+              placeholder={t('page.add.persona.hint')}
+              onChange={(event) => { setAddDraft(state => ({ ...state, persona: event.target.value })) }}
+            />
+          </label>
+        </div>
+      </Modal>
     </article>
   )
 }
