@@ -255,6 +255,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.hero.workspace': { kind: 'single', scope: 'root' },
       'conversation.hero.agentPreset': { kind: 'single', scope: 'session-maybe' },
       'conversation.hero.capability': { kind: 'single', scope: 'session-maybe' },
+      'conversation.hero.footer': { kind: 'single', scope: 'session-maybe' },
     },
     slots: {
       views: { scope: 'session' },
@@ -264,6 +265,11 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       hooks: {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
       },
+      // Optional distribution service: a capability conversation's standing
+      // workspace answer. Read, not injected — the providing plugin may load
+      // after this one, and the face is optional by contract.
+      capabilityWorkspace: (ctx as { get(name: string): unknown }).get('capabilityWorkspace') as
+        ConversationInjected['capabilityWorkspace'],
       selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, (nextId) => {
         if (sessionId !== undefined && nextId !== sessionId) {
           const from = inputHub.shell(sessionId)

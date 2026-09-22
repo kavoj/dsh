@@ -18,8 +18,14 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 
-/** Entries a group renders at once, both as recency and as a first-run default. */
-export const CATALOG_VISIBLE_LIMIT = 5
+/**
+ * Entries a group renders at once, both as recency and as a first-run
+ * default. Sized to the largest shipped centre (AI参谋部's nine agents — the
+ * approved prototype lists them all in the menu), so a distribution's full
+ * roster fits without a second step; a centre may still exceed it, and then
+ * its declared head shows with the view-all jump carrying the rest.
+ */
+export const CATALOG_VISIBLE_LIMIT = 9
 
 /** Entry ids remembered across groups, most recent first. */
 const RECENT_CAPACITY = 32
@@ -333,12 +339,14 @@ export function createSidebarCatalog(
     const entries = new Map(group.entries.map(entry => [entry.id, entry]))
     const recent = progress.getSnapshot().recent
       .flatMap(id => entries.get(id) ?? [])
-      .slice(0, CATALOG_VISIBLE_LIMIT)
     return {
       group,
-      // Recency first; with none recorded yet, the declared head keeps the
-      // group useful on a first visit instead of rendering it empty.
-      visible: recent.length > 0 ? recent : group.entries.slice(0, CATALOG_VISIBLE_LIMIT),
+      // Recency first, but never a replacement: the recently used entries
+      // float to the top and the declared head fills the rest, so using one
+      // capability does not hide the ones nobody has opened yet (a recency
+      // -only list would render a nine-agent centre as one row).
+      visible: [...new Map([...recent, ...group.entries]
+        .map(entry => [entry.id, entry])).values()].slice(0, CATALOG_VISIBLE_LIMIT),
       total: group.entries.length,
       expanded: unfolded.includes(group.id),
     }

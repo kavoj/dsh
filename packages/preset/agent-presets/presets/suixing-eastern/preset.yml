@@ -1,3 +1,7 @@
 name: 东方智慧玄学官
 description: 随星 AI参谋部：从东方文化与传统智慧出发，陪你整理表达、寓意与思绪；文化交流与娱乐参考，不作经营决策依据。
 order: 27
+
+# A role persona the capability directory assigns programmatically;
+# not a mode a person picks for an ordinary session.
+pickable: false

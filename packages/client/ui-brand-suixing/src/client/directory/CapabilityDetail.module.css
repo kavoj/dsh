@@ -271,44 +271,75 @@
 }
 
 /* The conversation hero's capability card: the onboarding the named
-   conversation shows before its first message. Narrower than the detail
-   page — the hero already owns the centering and the composer below. */
+   conversation shows before its first message, in the design file's layout —
+   a centered column (the transcript's own width) with generous top air, a
+   small gray kicker, a large headline, the how-to sentence, full-width
+   starter rows, and a "how to start" block closed by the numbered steps. */
 .heroCard {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   margin: 0 auto;
   max-width: 620px;
-  padding: 14px 18px;
+  padding: 28px 32px 24px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 14px;
   background: var(--dsw-alias-surface-primary);
 }
 
 .heroKicker {
+  margin: 0;
   font-size: 12px;
   line-height: 17px;
   color: var(--dsw-alias-label-tertiary);
 }
 
 .heroTitle {
-  font-size: 20px;
-  line-height: 28px;
+  margin: 0;
+  font-size: 26px;
+  line-height: 36px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   color: var(--dsw-alias-label-primary);
 }
 
 .heroHowto {
+  margin: 0;
   font-size: 13px;
-  line-height: 20px;
+  line-height: 22px;
   color: var(--dsw-alias-label-secondary);
   overflow-wrap: anywhere;
+}
+
+.heroHowBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--dsw-alias-border-l3);
+}
+
+.heroHowHeading {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+.heroHowHelper {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
 }
 
 .heroSteps {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
+  margin: 0;
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary);
@@ -317,8 +348,8 @@
 .heroStarters {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 4px 0 0;
+  gap: 8px;
+  margin: 6px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -329,7 +360,7 @@
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   background: transparent;
@@ -349,6 +380,17 @@
   flex: 0 0 auto;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
+}
+
+/* The composer footnote a capability conversation signs: where the chat is
+   kept — one quiet line under the composer card, centered like the card. */
+.heroFooter {
+  margin: 6px auto 0;
+  max-width: 620px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
 }
 
 /* The platform invoke panel (v1 open API): one describe-submit-watch loop. */

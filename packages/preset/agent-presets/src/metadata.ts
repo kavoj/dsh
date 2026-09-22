@@ -36,6 +36,13 @@ export interface PresetMetadata {
    * can read in capability order while authored ones stay alphabetical.
    */
   readonly order?: number
+  /**
+   * Whether the mode picker offers this preset. `false` marks a role preset a
+   * flow assigns programmatically (a distribution's capability persona): it
+   * mounts and labels sessions as any other, but a person picking a mode for
+   * their next session never sees it. Absent means pickable.
+   */
+  readonly pickable?: boolean
 }
 
 /** A non-empty trimmed string, or undefined for anything else. */
@@ -77,10 +84,12 @@ export async function readPresetMetadata(directory: string): Promise<PresetMetad
   const order = typeof record.order === 'number' && Number.isFinite(record.order)
     ? record.order
     : undefined
+  const pickable = record.pickable === false ? false : undefined
   return {
     ...name === undefined ? {} : { name },
     ...description === undefined ? {} : { description },
     ...order === undefined ? {} : { order },
+    ...pickable === undefined ? {} : { pickable },
   }
 }
 
@@ -95,11 +104,14 @@ export async function readPresetMetadata(directory: string): Promise<PresetMetad
 export function renderPresetMetadata(metadata: PresetMetadata): string | undefined {
   const name = text(metadata.name)
   const description = text(metadata.description)
-  const { order } = metadata
-  if (name === undefined && description === undefined && order === undefined) return undefined
+  const { order, pickable } = metadata
+  if (name === undefined && description === undefined && order === undefined && pickable === undefined) {
+    return undefined
+  }
   return yaml.dump({
     ...name === undefined ? {} : { name },
     ...description === undefined ? {} : { description },
     ...order === undefined ? {} : { order },
+    ...pickable === undefined ? {} : { pickable },
   }, { lineWidth: -1 })
 }

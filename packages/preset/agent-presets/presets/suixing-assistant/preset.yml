@@ -1,3 +1,7 @@
 name: 超级助理
 description: 随星 AI参谋部：把零散的会议、计划、资料整理成有负责人、有期限、有下一步的清单。
 order: 23
+
+# A role persona the capability directory assigns programmatically;
+# not a mode a person picks for an ordinary session.
+pickable: false

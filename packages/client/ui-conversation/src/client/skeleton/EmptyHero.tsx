@@ -25,19 +25,24 @@ export function workspaceLabel(cwd: string): string {
 }
 
 /**
- * The workspace chip (folder + label + chevron), always interactive: before
+ * The workspace chip (folder + label + chevron), usually interactive: before
  * the first message the workspace stays switchable — picking another one
  * moves the New Session flow to that workspace's blank session. Without a
  * label the chip renders its placeholder state: closed folder + the
- * "Choose workspace" call to action.
+ * "Choose workspace" call to action. A conversation with a standing
+ * capability home (`interactive: false`) renders the same chip as a static
+ * label — no chevron, no picker — because its workspace is a name, not a
+ * choice.
  * @param props.label - chip label (see {@link workspaceLabel}); omitted → placeholder.
+ * @param props.interactive - picker affordance; default true.
  * @param props.menuOpen - menu expansion echo.
  * @param props.onClick - menu toggle.
  * @returns the chip button element.
  */
-export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, t }: {
+export function WorkspaceChip({ buttonRef, label, interactive = true, menuOpen = false, onClick, t }: {
   buttonRef?: RefObject<HTMLButtonElement>
   label?: string | undefined
+  interactive?: boolean
   menuOpen?: boolean
   onClick?: () => void
   t: HeroTranslate
@@ -47,16 +52,17 @@ export function WorkspaceChip({ buttonRef, label, menuOpen = false, onClick, t }
       ref={buttonRef}
       type="button"
       className={css.workspace}
-      aria-label={t('hero.chooseWorkspace')}
-      aria-haspopup="menu"
-      aria-expanded={menuOpen}
-      onClick={onClick}
+      aria-label={interactive ? t('hero.chooseWorkspace') : label}
+      aria-haspopup={interactive ? 'menu' : undefined}
+      aria-expanded={interactive ? menuOpen : undefined}
+      onClick={interactive ? onClick : undefined}
+      style={interactive ? undefined : { cursor: 'default' }}
     >
       {label === undefined
         ? <IconFolderClose16 className={css.folder} size={16} />
         : <IconFolderOpen16 className={css.folder} size={16} />}
       <span className={css.workspaceLabel}>{label ?? t('hero.chooseWorkspace')}</span>
-      <IconChevronDownOutline14 className={css.chevron} size={12} />
+      {interactive && <IconChevronDownOutline14 className={css.chevron} size={12} />}
     </button>
   )
 }

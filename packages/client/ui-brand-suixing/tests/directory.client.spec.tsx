@@ -177,10 +177,10 @@ describe('SuiXing capability directory — published data', () => {
     expect(creation?.group.allPanel).toBe(CREATION_PANEL)
     expect([directoryZh['group.creation'], directoryEn['group.creation']])
       .toContain(creation?.group.title)
-    // The menu shows the shell's recency budget while each group holds its own
-    // capabilities: nine agents, four scenarios, one project note, four
-    // creations.
-    expect(agents?.visible).toHaveLength(5)
+    // The menu lists every declared capability (the prototype lists all nine
+    // agents in the menu), while each group holds its own: nine agents, four
+    // scenarios, one project note, four creations.
+    expect(agents?.visible).toHaveLength(9)
     expect(agents?.total).toBe(9)
     expect(automation?.total).toBe(4)
     expect(creation?.total).toBe(4)

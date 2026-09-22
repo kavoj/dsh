@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import {
-  CATALOG_VISIBLE_LIMIT, createSidebarCatalog,
+  createSidebarCatalog,
   type CatalogChild, type CatalogEntry, type CatalogGroup,
 } from '../src/client/catalog.ts'
 
@@ -127,14 +127,16 @@ describe('sidebar catalog registry', () => {
     const entries = ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'].map(id => entry(id))
     const catalog = createSidebarCatalog(vi.fn())
     catalog.register(group('a', entries))
+    // First run: the declared head, up to the visible budget.
     expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
-      .toEqual(['e1', 'e2', 'e3', 'e4', 'e5'])
+      .toEqual(['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7'])
     expect(catalog.getSnapshot().groups[0]?.total).toBe(entries.length)
-    // The most recent visit leads, and the cap holds.
+    // The most recent visit leads, the declared head fills the rest, and the
+    // cap holds — recency reorders, it never hides the untouched entries.
     for (const candidate of entries) catalog.activate(candidate)
     expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
-      .toEqual(['e7', 'e6', 'e5', 'e4', 'e3'])
-    expect(catalog.getSnapshot().groups[0]?.visible).toHaveLength(CATALOG_VISIBLE_LIMIT)
+      .toEqual(['e7', 'e6', 'e5', 'e4', 'e3', 'e2', 'e1'])
+    expect(catalog.getSnapshot().groups[0]?.visible).toHaveLength(entries.length)
     catalog.dispose()
   })
 
@@ -159,9 +161,10 @@ describe('sidebar catalog registry', () => {
     const catalog = createSidebarCatalog(vi.fn())
     catalog.register(group('a', entries))
     for (const candidate of entries) catalog.activate(candidate)
-    // The newest 5 survive; the earliest visit was evicted by the cap.
+    // The newest `CATALOG_VISIBLE_LIMIT` survive; the earliest visits fell
+    // out of the visible slice (and evicted from recency past its capacity).
     expect(catalog.getSnapshot().groups[0]?.visible.map(e => e.id))
-      .toEqual(['e39', 'e38', 'e37', 'e36', 'e35'])
+      .toEqual(['e39', 'e38', 'e37', 'e36', 'e35', 'e34', 'e33', 'e32', 'e31'])
     catalog.dispose()
   })
 

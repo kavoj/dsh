@@ -89,8 +89,20 @@ describe('the shipped preset root', () => {
     const ctx = await roster({ includeUserRoot: false })
 
     const listed = await ctx.agentPresets.list()
-    expect(listed.map(preset => preset.id).sort()).toEqual(['cordis', 'minimal', 'ptc', 'standard'])
+    // The shipped root carries the four base modes plus the SuiXing role
+    // personas (DEV-086), which metadata marks unpickable — they mount and
+    // label sessions but no mode picker offers them.
+    expect(listed.map(preset => preset.id).sort()).toEqual([
+      'cordis', 'minimal', 'ptc', 'standard',
+      'suixing-assistant', 'suixing-brand', 'suixing-chief', 'suixing-copy',
+      'suixing-eastern', 'suixing-legal', 'suixing-people', 'suixing-sales',
+      'suixing-videoip',
+    ])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
+    expect(listed.filter(preset => preset.id.startsWith('suixing-'))
+      .every(preset => preset.pickable === false)).toBe(true)
+    expect(listed.filter(preset => !preset.id.startsWith('suixing-'))
+      .every(preset => preset.pickable === undefined)).toBe(true)
     // Not `broken === undefined`: health asks whether each row's package is
     // installed above the base, and the shipped rows name packages the
     // deployment installs beside the roster. This fixture base is not that

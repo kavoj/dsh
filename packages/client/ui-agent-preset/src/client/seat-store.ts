@@ -99,7 +99,10 @@ export class AgentPresetSeatController {
     const session = this.currentSession()
     this.set({
       showPicker: modeSelectionEnabled,
-      options: presetOptions(presets),
+      // The mode picker lists what a person may pick for their next session:
+      // healthy presets, minus role presets a flow assigns programmatically
+      // (`pickable: false` — they mount and label sessions, but are not modes).
+      options: presetOptions(presets.filter(preset => preset.pickable !== false)),
       // Staged pick first, then the composition the current session
       // already carries, then the Host-effective default. The middle term is
       // what keeps a late-landing load from regressing the display after

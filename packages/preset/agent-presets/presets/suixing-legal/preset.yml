@@ -1,3 +1,7 @@
 name: 法务智能体
 description: 随星 AI参谋部：把条款看明白、把风险分好级，输出能直接带去问律师的问题清单；不替代执业律师。
 order: 22
+
+# A role persona the capability directory assigns programmatically;
+# not a mode a person picks for an ordinary session.
+pickable: false

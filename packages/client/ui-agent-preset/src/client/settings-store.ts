@@ -119,7 +119,10 @@ export async function beginRosterRead<S extends { status: string; error: string 
  * The chip exists to choose the NEXT session's composition, and a broken
  * preset cannot compose one — offering it would defer the discovery of that
  * fact to a failed session start. The management section renders the full
- * roster (broken rows included) from its own store instead.
+ * roster (broken rows included) from its own store instead. Unpickable rows
+ * (`pickable: false`) stay IN this list: the header label resolves its name
+ * here, and the management section still manages them — only the mode seat
+ * filters further (see the seat store).
  *
  * The chip, the header label, and the management section all show the same
  * facts, and `exactOptionalPropertyTypes` makes "absent" and "present as
@@ -129,7 +132,7 @@ export async function beginRosterRead<S extends { status: string; error: string 
  * @returns one option per selectable preset, in roster order.
  */
 export function presetOptions(
-  presets: readonly { id: string; trust: 'system' | 'user'; name?: string; description?: string; broken?: string }[],
+  presets: readonly { id: string; trust: 'system' | 'user'; name?: string; description?: string; broken?: string; pickable?: boolean }[],
 ): AgentPresetOption[] {
   return presets.filter(preset => preset.broken === undefined).map(preset => ({
     id: preset.id,

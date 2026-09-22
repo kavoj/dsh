@@ -1,3 +1,7 @@
 name: 品牌战略定位官
 description: 随星 AI参谋部：从客户、产品与差异出发，把品牌定位、核心卖点和对外表达理成能直接使用的一页。
 order: 21
+
+# A role persona the capability directory assigns programmatically;
+# not a mode a person picks for an ordinary session.
+pickable: false

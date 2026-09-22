@@ -22,7 +22,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const {
     sessionId, phase, hero, useSession, useSessions, useSessionStatus,
     useWorkspaces, useInput, useComposerBlock, renderSlot, renderSlotChain,
-    selectWorkspace, t, useFactorySlot,
+    selectWorkspace, capabilityWorkspace, t, useFactorySlot,
   } = props
   const session = useSession(snapshot => snapshot)
   const Views = useFactorySlot('views', ConversationSessionView)
@@ -86,6 +86,8 @@ export function ConversationContent(props: ConversationContentProps) {
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 
   // The chip is a selector; label resolution walks the flow top-down:
+  //   0. a capability conversation (distribution service) → its standing
+  //      workspace name as a STATIC label — the picker flow below never runs;
   //   1. a just-picked workspace (pending) → its title;
   //   2. cold start, no session yet → placeholder ("Choose workspace");
   //   3. the blank session's workspace is in the list → its title;
@@ -93,7 +95,9 @@ export function ConversationContent(props: ConversationContentProps) {
   //      flash on refresh (empty cwd → placeholder);
   //   5. list ready but no owning workspace (deleted from the sidebar) →
   //      placeholder, never the deleted folder's name via cwd.
-  const chipTitle = pendingWorkspace?.title
+  const capabilityBadge = capabilityWorkspace?.badgeFor(sessionId)
+  const chipTitle = capabilityBadge
+    ?? pendingWorkspace?.title
     ?? (sessionId === undefined
       ? undefined
       : sessionWorkspace?.title
@@ -107,6 +111,10 @@ export function ConversationContent(props: ConversationContentProps) {
         buttonRef={pickerAnchor}
         label={chipTitle}
         menuOpen={pickerOpen}
+        // A capability conversation's chip is a label, not a door: its home
+        // is the capability's own menu, and picking a workspace here would
+        // move the conversation out of it.
+        interactive={capabilityBadge === undefined}
         onClick={() => { setPickerOpen(open => !open) }}
         t={t}
       />
@@ -124,7 +132,6 @@ export function ConversationContent(props: ConversationContentProps) {
         onClose: () => { setPickerOpen(false) },
       })}
       {renderSlot('conversation.hero.agentPreset', {})}
-      {renderSlot('conversation.hero.capability', {})}
     </div>
   )
 
@@ -138,6 +145,7 @@ export function ConversationContent(props: ConversationContentProps) {
   // one disabled textarea, never a second tree. The no-workspace state wins
   // when both hold — picking a workspace is the earlier prerequisite.
   const blocked = !inert && composerBlock !== undefined
+  const capabilityPlaceholder = capabilityWorkspace?.placeholderFor?.(sessionId)
   const inputBar = renderSlot('conversation.composer.bar', {
     variant: hero ? 'hero' : 'composer',
     ...(inert
@@ -152,7 +160,9 @@ export function ConversationContent(props: ConversationContentProps) {
         // block keeps the model seat live because choosing a model is how the
         // user clears it.
         ? { blocked: composerBlock, placeholder: composerBlock.reason }
-        : hero ? { placeholder: t('placeholder.hero') } : {}),
+        : hero
+          ? { placeholder: capabilityPlaceholder ?? t('placeholder.hero') }
+          : {}),
   })
 
   const composerBar = (
@@ -161,6 +171,9 @@ export function ConversationContent(props: ConversationContentProps) {
       {hero && heroWorkspaceRow}
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
+      {/* A capability conversation signs the page: where the chat is kept and
+          what a send would cost. Baseline sessions render nothing. */}
+      {hero && renderSlot('conversation.hero.footer', {})}
     </div>
   )
 
@@ -189,6 +202,10 @@ export function ConversationContent(props: ConversationContentProps) {
     >
       <div className={css.scrollBody} data-conversation-scroll="">
         {sessionId === undefined ? null : <Views />}
+        {/* A capability's guidance card lives in the scroll body — the page's
+            own column, centered like the transcript it precedes — not in the
+            chip row it used to share. */}
+        {renderSlot('conversation.hero.capability', {})}
         {composerSeat}
       </div>
       <WidthControls container={body} phase={phase} />

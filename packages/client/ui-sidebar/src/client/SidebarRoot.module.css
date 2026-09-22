@@ -499,15 +499,16 @@
 /* Catalog seat: a bounded, self-scrolling stack BELOW the workspace browser,
    so a distribution's business centres sit under the workspace list the user
    already knows, not above it (the global panel rows stay directly under New
-   Session). `flex: none` keeps the stack whole and hugging the browser above
-   it: the slack moves to the space between the stack and the foot, so the
-   centres read as the list's neighbours instead of bottom-docked rows. The
+   Session). Content-driven height (`flex: 0 1 auto`) keeps the stack hugging
+   the browser above it when short — the centres read as the list's neighbours
+   — and lets it grow with expanded nested rows instead of clipping them; when
+   the whole column runs out of room the seat shrinks and scrolls inside
+   itself (the workspace browser shrinks with it, sharing the pressure). The
    seat is absent from the DOM entirely until a distribution publishes a
    group, so the default sidebar keeps its layout. */
 .catalogArea {
-  flex: none;
+  flex: 0 1 auto;
   min-height: 0;
-  max-height: 55%;
   overflow-y: auto;
   overscroll-behavior: contain;
 }

@@ -37,7 +37,7 @@ import type { BridgesService } from '../bridges/store.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { registerSuiXingReferences } from '../references/index.ts'
 import { createRolePresets } from '../presets/index.ts'
-import { CapabilityHero } from '../threads/hero.tsx'
+import { CapabilityFooter, CapabilityHero, owningCapability } from '../threads/hero.tsx'
 import { createThreadDialogs, ThreadDialogModals } from '../threads/dialogs.tsx'
 import { createThreadLauncher } from '../threads/launcher.ts'
 import { threadRows, type ThreadSummary } from '../threads/spec.ts'
@@ -184,8 +184,9 @@ export function registerSuiXingDirectory(
     }, ThreadDialogModals)),
     'ui-brand-suixing: thread dialogs',
   )
-  // A blank conversation's hero carries its capability's onboarding card;
-  // unclaimed conversations leave the hero exactly as the base built it.
+  // A blank conversation's hero carries its capability's onboarding card, and
+  // its composer signs where the chat is kept; unclaimed conversations leave
+  // both exactly as the base built them.
   ctx.effect(
     () => ctx.slots.inject('conversation.hero.capability', () => ctx.slots.register({
       name: 'conversation.hero.capability',
@@ -194,6 +195,32 @@ export function registerSuiXingDirectory(
     }, CapabilityHero)),
     'ui-brand-suixing: capability hero',
   )
+  ctx.effect(
+    () => ctx.slots.inject('conversation.hero.footer', () => ctx.slots.register({
+      name: 'conversation.hero.footer',
+      locale: DIRECTORY_NS,
+      inject: () => ({ threads }),
+    }, CapabilityFooter)),
+    'ui-brand-suixing: capability composer footnote',
+  )
+  // The conversation hero reads this optional service for the standing
+  // workspace answer: a capability conversation's chip shows the capability
+  // home as a static label, and its composer opens on the capability's
+  // example question — no "choose workspace" prompt, no picker.
+  ctx.provide('capabilityWorkspace', {
+    badgeFor: (sessionId: string | undefined) => {
+      const bound = sessionId !== undefined
+        && threads.getSnapshot().records.some(record => record.sessionId === sessionId)
+      return bound ? t('thread.home') : undefined
+    },
+    placeholderFor: (sessionId: string | undefined) => {
+      const spec = owningCapability(threads, sessionId)
+      if (spec === undefined) return undefined
+      // The capability's own example first; otherwise its first starter.
+      return spec.exampleKey !== undefined ? t(spec.exampleKey)
+        : (spec.starters?.[0] !== undefined ? t(spec.starters[0]) : undefined)
+    },
+  })
   // One navigation, two writers: the sidebar entry and the card both say "show
   // this capability", and the panel that renders it is the menu's own.
   const openEntry = (panelId: MainPanelId, entryId: string): void => {

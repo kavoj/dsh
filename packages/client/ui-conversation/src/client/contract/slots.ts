@@ -190,6 +190,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * exactly as before) unless a distribution fills it.
      */
     'conversation.hero.capability': { kind: 'single'; scope: 'session-maybe'; owner: HeroCapabilityOwnerProps }
+    /**
+     * A capability conversation's composer footnote: where the chat is kept
+     * and what a send costs, rendered under the composer card on the
+     * blank-session Hero. Empty (nothing renders) unless a distribution
+     * fills it.
+     */
+    'conversation.hero.footer': { kind: 'single'; scope: 'session-maybe'; owner: HeroCapabilityOwnerProps }
     /** Full-width entries above the composer card. */
     'conversation.input.dock': { kind: 'list'; scope: 'session'; owner: InputZone }
     /** Floating entries rendered inside the resident composer card. */
@@ -230,6 +237,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
         'conversation.hero.workspace': { kind: 'single'; scope: 'root' }
         'conversation.hero.agentPreset': { kind: 'single'; scope: 'session-maybe' }
         'conversation.hero.capability': { kind: 'single'; scope: 'session-maybe' }
+        'conversation.hero.footer': { kind: 'single'; scope: 'session-maybe' }
       }
       inject: ConversationInjected
       locale: 'conversation'
@@ -327,6 +335,23 @@ export type ConvViewProps = PropsRuntime<'conversation.view'>
 export interface ConversationInjected {
   /** Connect and open a blank Session in the selected Workspace. */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
+  /**
+   * A capability conversation's standing workspace answer, supplied by an
+   * optional distribution service (`capabilityWorkspace` on the client
+   * context). When it answers for the current Session, the hero chip shows
+   * that name as a static label — the conversation lives in the capability's
+   * own menu, so the "Choose workspace" prompt and picker are both out of
+   * place. Absent when no distribution provides the service.
+   */
+  capabilityWorkspace?: {
+    /** The badge for one Session, or undefined when it has no capability home. */
+    badgeFor(sessionId: SessionId | undefined): string | undefined
+    /**
+     * The composer placeholder for one Session, or undefined for the hero
+     * default. A capability greets with an example of what to ask it.
+     */
+    placeholderFor?(sessionId: SessionId | undefined): string | undefined
+  } | undefined
   /** Session-addressed composer block source, or the stable absent source. */
   hooks: { composerBlock: ObservableSnapshot<ComposerBlock | undefined> }
 }

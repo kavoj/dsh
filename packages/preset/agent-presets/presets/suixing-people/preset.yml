@@ -1,3 +1,7 @@
 name: 组织人事官
 description: 随星 AI参谋部：把岗位职责、招聘要求、协作流程理清楚，让岗位清楚、协作顺畅；不替代专业人力与法务意见。
 order: 25
+
+# A role persona the capability directory assigns programmatically;
+# not a mode a person picks for an ordinary session.
+pickable: false

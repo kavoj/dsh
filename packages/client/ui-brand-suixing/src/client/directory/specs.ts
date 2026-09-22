@@ -42,6 +42,11 @@ export interface CapabilitySpec {
    * Absent means the hero carries the name, the promise, and the how-to only.
    */
   readonly starters?: readonly SuiXingDirectoryKey[]
+  /**
+   * The composer's opening example on the conversation hero. Absent falls
+   * back to the first starter, then the base hero placeholder.
+   */
+  readonly exampleKey?: SuiXingDirectoryKey
 }
 
 /** One collapsible business menu plus the panel its directory opens. */
@@ -161,6 +166,8 @@ const CHIEF: CapabilitySpec = {
   ],
   // The conversation hero's one-tap starters (页面原型 01_总裁决策官_进入页).
   starters: ['starter.chief.1', 'starter.chief.2', 'starter.chief.3'],
+  // The composer's opening example (same prototype's input placeholder).
+  exampleKey: 'hero.example.chief',
   // The menu card keeps one row: the self-introduction carries the pitch.
   card: [
     { termKey: 'field.intro', valueKey: 'entry.chief.intro' },
