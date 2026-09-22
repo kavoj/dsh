@@ -97,6 +97,8 @@ export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   readonly addAgent?: ((draft: AgentDraft) => void) | undefined
   /** Rewrite one locally built agent from the edit form; absent hides editing. */
   readonly updateAgent?: ((id: string, draft: AgentDraft) => void) | undefined
+  /** Forget one locally built agent; absent hides the delete door. */
+  readonly removeAgent?: ((id: string) => void) | undefined
   /** Persist the entry sequence the user dragged; absent disables dragging. */
   readonly reorderEntries?: ((entryIds: readonly string[]) => void) | undefined
 }
@@ -129,7 +131,7 @@ function bridgeBadge(
 export function DirectoryPage({
   group, useCenters = noCenters, useBridges = noBridges, useFocus = noFocus,
   useCatalog = noCatalog, focusCapability, clearFocus, startCapability,
-  addAgent, updateAgent, reorderEntries, t,
+  addAgent, updateAgent, removeAgent, reorderEntries, t,
 }: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
@@ -270,6 +272,36 @@ export function DirectoryPage({
     setEditId(null)
   }
 
+  // The delete door: one locally built agent at a time, behind a confirm. The
+  // removal writes through the same service every surface reads, so the card,
+  // the sidebar entry, and any conversation binding move together; the detail
+  // view of a just-deleted agent re-resolves to nothing and the list returns.
+  const canDelete = group.panelId === AGENTS_PANEL && removeAgent !== undefined
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const confirmDelete = (): void => {
+    if (!canDelete || deleteTarget === null) return
+    removeAgent(deleteTarget.id)
+    setDeleteTarget(null)
+  }
+  const deleteModal = (
+    <Modal
+      open={deleteTarget !== null}
+      onClose={() => { setDeleteTarget(null) }}
+      closeLabel={t('page.delete.cancel')}
+      title={t('page.delete.title')}
+      footer={(
+        <>
+          <Button variant="outline" onClick={() => { setDeleteTarget(null) }}>{t('page.delete.cancel')}</Button>
+          <Button variant="outline" className={css.deleteConfirm} onClick={confirmDelete}>{t('page.delete.confirm')}</Button>
+        </>
+      )}
+    >
+      <p className={css.editHint}>
+        {deleteTarget === null ? '' : t('page.delete.hint', { name: deleteTarget.name })}
+      </p>
+    </Modal>
+  )
+
   // The focused capability, resolved against both halves of the list: a shipped
   // id opens its definition, a local id opens the record the architect built.
   const detail = useMemo((): DetailTarget | null => {
@@ -369,9 +401,13 @@ export function DirectoryPage({
           onEdit={detail.kind === 'agent' && canEdit
             ? () => { openEdit(detail.agent.id) }
             : undefined}
+          onDelete={detail.kind === 'agent' && canDelete
+            ? () => { setDeleteTarget({ id: detail.agent.id, name: detail.agent.name }) }
+            : undefined}
           t={t}
         />
         {editModal}
+        {deleteModal}
       </>
     )
   }
@@ -439,6 +475,16 @@ export function DirectoryPage({
                       onClick={() => { openEdit(row.id) }}
                     >
                       {t('page.edit')}
+                    </button>
+                  )}
+                  {row.local && canDelete && (
+                    <button
+                      type="button"
+                      className={css.cardEdit}
+                      aria-label={t('page.delete.aria', { name: row.name })}
+                      onClick={() => { setDeleteTarget({ id: row.id, name: row.name }) }}
+                    >
+                      {t('page.delete')}
                     </button>
                   )}
                   <button
@@ -511,6 +557,7 @@ export function DirectoryPage({
         </Modal>
       </article>
       {editModal}
+      {deleteModal}
     </>
   )
 }

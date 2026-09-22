@@ -538,6 +538,66 @@ describe('SuiXing capability directory — one capability in full', () => {
     expect(screen.getByDisplayValue(LOCAL_AGENT.rolePrompt)).toBeTruthy()
   })
 
+  it('deletes a locally built agent from its card, behind a confirm', () => {
+    const removeAgent = vi.fn()
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useCenters={centersHook(snapshot)}
+        removeAgent={removeAgent} />,
+    )
+    // Shipped cards carry no delete door; the local one does.
+    expect(screen.queryByRole('button', { name: '删除 总裁决策官' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '删除 面料合规顾问' }))
+    expect(screen.getByText('删除智能体')).toBeTruthy()
+    expect(screen.getByText(/将从 Agent中心 与侧栏移除/)).toBeTruthy()
+    // The confirm — not the card's own button — performs the removal.
+    fireEvent.click(screen.getAllByRole('button', { name: '删除' }).at(-1) as HTMLElement)
+    expect(removeAgent).toHaveBeenCalledTimes(1)
+    expect(removeAgent).toHaveBeenCalledWith(LOCAL_AGENT.id)
+  })
+
+  it('cancels the delete confirm and keeps the agent', () => {
+    const removeAgent = vi.fn()
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useCenters={centersHook(snapshot)}
+        removeAgent={removeAgent} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: '删除 面料合规顾问' }))
+    fireEvent.click(screen.getByText('取消'))
+    expect(screen.queryByText('删除智能体')).toBeNull()
+    expect(removeAgent).not.toHaveBeenCalled()
+  })
+
+  it('offers the same delete door from an agent detail page', () => {
+    const removeAgent = vi.fn()
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook(LOCAL_AGENT.id)}
+        useCenters={centersHook(snapshot)} removeAgent={removeAgent} />,
+    )
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('面料合规顾问')
+    fireEvent.click(screen.getAllByRole('button', { name: '删除' })[0] as HTMLElement)
+    expect(screen.getByText('删除智能体')).toBeTruthy()
+    fireEvent.click(screen.getAllByRole('button', { name: '删除' }).at(-1) as HTMLElement)
+    expect(removeAgent).toHaveBeenCalledWith(LOCAL_AGENT.id)
+  })
+
+  it('keeps the delete door out of menus that hold no local agents', () => {
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(<DirectoryPage group={AUTOMATION} t={zhT} useCenters={centersHook(snapshot)}
+      removeAgent={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /删除 / })).toBeNull()
+  })
+
   it('shows what the architect built: prompt, opening line, starters, assumptions', () => {
     const snapshot: CentersSnapshot = {
       source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],

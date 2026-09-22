@@ -349,3 +349,13 @@ li[draggable="true"] {
   line-height: 18px;
   color: var(--dsw-alias-label-secondary);
 }
+
+/* 删除确认: the modal's confirm carries the danger tone, outline rank. */
+.deleteConfirm {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: var(--dsw-alias-state-error-secondary);
+}
+
+.deleteConfirm:hover {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}

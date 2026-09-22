@@ -499,3 +499,15 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
 }
+
+/* 删除入口: lower-rank than the start control, in the danger tone. */
+.deleteButton {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: var(--dsw-alias-state-error-secondary);
+}
+
+.deleteButton:hover {
+  color: var(--dsw-alias-state-error-primary);
+  border-color: var(--dsw-alias-state-error-secondary);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}

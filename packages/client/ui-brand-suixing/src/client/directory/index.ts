@@ -276,6 +276,7 @@ export function registerSuiXingDirectory(
         // the centre to the sidebar and to the conversation page.
         addAgent: (draft: AgentDraft) => { centers.addAgent(draft) },
         updateAgent: (id: string, draft: AgentDraft) => { centers.updateAgent(id, draft) },
+        removeAgent: (id: string) => { centers.removeAgent(id) },
         reorderEntries: (entryIds: readonly string[]) => {
           ctx.sidebarCatalog.reorderEntries(group.id, entryIds)
         },
