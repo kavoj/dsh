@@ -95,6 +95,8 @@ export type DirectoryPageProps = PropsLocale<typeof DIRECTORY_NS> & {
   readonly startCapability?: ((id: string) => void) | undefined
   /** Store one agent added from this page's own form; absent hides the form. */
   readonly addAgent?: ((draft: AgentDraft) => void) | undefined
+  /** Rewrite one locally built agent from the edit form; absent hides editing. */
+  readonly updateAgent?: ((id: string, draft: AgentDraft) => void) | undefined
   /** Persist the entry sequence the user dragged; absent disables dragging. */
   readonly reorderEntries?: ((entryIds: readonly string[]) => void) | undefined
 }
@@ -127,7 +129,7 @@ function bridgeBadge(
 export function DirectoryPage({
   group, useCenters = noCenters, useBridges = noBridges, useFocus = noFocus,
   useCatalog = noCatalog, focusCapability, clearFocus, startCapability,
-  addAgent, reorderEntries, t,
+  addAgent, updateAgent, reorderEntries, t,
 }: DirectoryPageProps) {
   const [query, setQuery] = useState('')
   const needle = query.trim().toLowerCase()
@@ -223,6 +225,51 @@ export function DirectoryPage({
     setAddDraft({ name: '', oneLiner: '', persona: '' })
   }
 
+  // The edit form: one locally built agent at a time, pre-filled with what it
+  // carries today. Saving writes through the same service the sidebar and the
+  // conversation page read, so the card, the nested entry, and the hero all
+  // move together — one fact, three surfaces.
+  const canEdit = group.panelId === AGENTS_PANEL && updateAgent !== undefined
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState({
+    name: '', oneLiner: '', persona: '', opening: '', starters: '',
+  })
+  const openEdit = (id: string): void => {
+    const agent = snapshot.agents.find(item => item.id === id)
+    if (agent === undefined) return
+    setEditDraft({
+      name: agent.name,
+      oneLiner: agent.oneLiner,
+      persona: agent.rolePrompt,
+      opening: agent.openingStatement,
+      starters: agent.starters.join('\n'),
+    })
+    setEditId(id)
+  }
+  const editBlocked = editDraft.name.trim() === ''
+  const confirmEdit = (): void => {
+    if (!canEdit || editId === null || editBlocked) return
+    const agent = snapshot.agents.find(item => item.id === editId)
+    if (agent === undefined) return
+    const name = editDraft.name.trim()
+    const oneLiner = editDraft.oneLiner.trim()
+    updateAgent(editId, {
+      name,
+      oneLiner: oneLiner === '' ? agent.oneLiner : oneLiner,
+      role: agent.role,
+      rolePrompt: editDraft.persona.trim(),
+      guardrails: agent.guardrails,
+      tools: agent.tools,
+      datasets: agent.datasets,
+      openingStatement: editDraft.opening.trim(),
+      starters: editDraft.starters.split('\n').map(line => line.trim()).filter(line => line !== ''),
+      inputs: agent.inputs,
+      outputContract: agent.outputContract,
+      assumptions: agent.assumptions,
+    })
+    setEditId(null)
+  }
+
   // The focused capability, resolved against both halves of the list: a shipped
   // id opens its definition, a local id opens the record the architect built.
   const detail = useMemo((): DetailTarget | null => {
@@ -243,141 +290,227 @@ export function DirectoryPage({
     return { spec, status: bridgeStatus(bridges, spec), url: bridgeUrl(bridges, spec), apiKey: bridges.apiKey }
   }, [detail, showsConnections, bridges])
 
+  // The edit modal lives outside the list/detail branch: the form opened from
+  // a card and the form opened from an agent's detail page are the same fact,
+  // and the modal has to mount over either.
+  const editModal = (
+    <Modal
+      open={editId !== null}
+      onClose={() => { setEditId(null) }}
+      closeLabel={t('page.edit.cancel')}
+      title={t('page.edit.title')}
+      footer={(
+        <>
+          <Button variant="outline" onClick={() => { setEditId(null) }}>{t('page.edit.cancel')}</Button>
+          <Button variant="primary" disabled={editBlocked} onClick={confirmEdit}>{t('page.edit.confirm')}</Button>
+        </>
+      )}
+    >
+      <div className={css.addForm}>
+        <p className={css.editHint}>{t('page.edit.hint')}</p>
+        <label className={css.addField}>
+          <span className={css.addFieldLabel}>{t('page.add.name')}</span>
+          <input
+            className={css.addFieldInput}
+            value={editDraft.name}
+            autoFocus
+            onChange={(event) => { setEditDraft(state => ({ ...state, name: event.target.value })) }}
+          />
+        </label>
+        <label className={css.addField}>
+          <span className={css.addFieldLabel}>{t('page.add.oneLiner')}</span>
+          <input
+            className={css.addFieldInput}
+            value={editDraft.oneLiner}
+            onChange={(event) => { setEditDraft(state => ({ ...state, oneLiner: event.target.value })) }}
+          />
+        </label>
+        <label className={css.addField}>
+          <span className={css.addFieldLabel}>{t('page.add.persona')}</span>
+          <textarea
+            className={css.addFieldArea}
+            rows={8}
+            value={editDraft.persona}
+            onChange={(event) => { setEditDraft(state => ({ ...state, persona: event.target.value })) }}
+          />
+        </label>
+        <label className={css.addField}>
+          <span className={css.addFieldLabel}>{t('page.edit.opening')}</span>
+          <input
+            className={css.addFieldInput}
+            value={editDraft.opening}
+            placeholder={t('page.edit.opening.hint')}
+            onChange={(event) => { setEditDraft(state => ({ ...state, opening: event.target.value })) }}
+          />
+        </label>
+        <label className={css.addField}>
+          <span className={css.addFieldLabel}>{t('page.edit.starters')}</span>
+          <textarea
+            className={css.addFieldArea}
+            rows={3}
+            value={editDraft.starters}
+            placeholder={t('page.edit.starters.hint')}
+            onChange={(event) => { setEditDraft(state => ({ ...state, starters: event.target.value })) }}
+          />
+        </label>
+      </div>
+    </Modal>
+  )
+
   if (detail !== null) {
     return (
-      <CapabilityDetail
-        group={group}
-        target={detail}
-        connection={connection}
-        onBack={() => { clearFocus?.() }}
-        onStart={() => { if (focusedId !== null) startCapability?.(focusedId) }}
-        t={t}
-      />
+      <>
+        <CapabilityDetail
+          group={group}
+          target={detail}
+          connection={connection}
+          onBack={() => { clearFocus?.() }}
+          onStart={() => { if (focusedId !== null) startCapability?.(focusedId) }}
+          onEdit={detail.kind === 'agent' && canEdit
+            ? () => { openEdit(detail.agent.id) }
+            : undefined}
+          t={t}
+        />
+        {editModal}
+      </>
     )
   }
 
   return (
-    <article className={css.page} aria-label={t(group.titleKey)}>
-      <header className={css.head}>
-        <h1 className={css.title}>{t(group.titleKey)}</h1>
-        <p className={css.subtitle}>{t(group.hintKey)}</p>
-      </header>
-      <p className={css.status}>
-        <span className={css.statusLabel}>{t('page.status')}</span>
-        <span className={css.statusHint}>{t('page.status.hint')}</span>
-      </p>
-      <div className={css.toolbar}>
-        <input
-          type="search"
-          className={css.search}
-          aria-label={t('page.search')}
-          placeholder={t('page.search')}
-          value={query}
-          onChange={(event) => { setQuery(event.target.value) }}
-        />
-        <span className={css.count}>{t('page.count', { count: rows.length })}</span>
-        {canAdd && (
-          <button
-            type="button"
-            className={css.addBtn}
-            onClick={() => { setAddDraft({ name: '', oneLiner: '', persona: '' }); setAddOpen(true) }}
-          >
-            <IconPlusOutline16 />
-            {t('page.add')}
-          </button>
-        )}
-      </div>
-      {reorderEntries !== undefined && draggable && rows.length > 1 && (
-        <p className={css.orderHint}>{t('page.order.hint')}</p>
-      )}
-      <ul className={css.list}>
-        {rows.map((row) => {
-          const badge = row.local
-            ? t('page.local.badge')
-            : (showsConnections && row.capability !== undefined
-              ? bridgeBadge(row.capability, bridges, t) ?? t('page.status')
-              : t('page.status'))
-          return (
-            <li
-              key={row.id}
-              className={`${css.card} ${dragId === row.id ? css.cardDragging : ''}`}
-              draggable={draggable}
-              onDragStart={() => { setDragId(row.id) }}
-              onDragOver={(event) => { if (dragId !== null) event.preventDefault() }}
-              onDrop={() => { dropOn(row.id) }}
-              onDragEnd={() => { setDragId(null) }}
+    <>
+      <article className={css.page} aria-label={t(group.titleKey)}>
+        <header className={css.head}>
+          <h1 className={css.title}>{t(group.titleKey)}</h1>
+          <p className={css.subtitle}>{t(group.hintKey)}</p>
+        </header>
+        <p className={css.status}>
+          <span className={css.statusLabel}>{t('page.status')}</span>
+          <span className={css.statusHint}>{t('page.status.hint')}</span>
+        </p>
+        <div className={css.toolbar}>
+          <input
+            type="search"
+            className={css.search}
+            aria-label={t('page.search')}
+            placeholder={t('page.search')}
+            value={query}
+            onChange={(event) => { setQuery(event.target.value) }}
+          />
+          <span className={css.count}>{t('page.count', { count: rows.length })}</span>
+          {canAdd && (
+            <button
+              type="button"
+              className={css.addBtn}
+              onClick={() => { setAddDraft({ name: '', oneLiner: '', persona: '' }); setAddOpen(true) }}
             >
-              <div className={css.cardHead}>
-                <h2 className={css.cardName}>{row.name}</h2>
-                <span className={css.badge}>{badge}</span>
-                <button
-                  type="button"
-                  className={css.cardOpen}
-                  aria-label={t('page.open', { name: row.name })}
-                  onClick={() => { focusCapability?.(row.id) }}
-                >
-                  {t('page.open.label')}
-                </button>
-              </div>
-              <p className={css.cardLead}>{row.hint}</p>
-              {row.capability !== undefined && (
-                <dl className={css.fields}>
-                  {(row.capability.card ?? row.capability.fields).map(field => (
-                    <div key={field.termKey} className={css.field}>
-                      <dt className={css.term}>{t(field.termKey)}</dt>
-                      <dd className={css.value}>{t(field.valueKey)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </li>
-          )
-        })}
-      </ul>
-      {rows.length === 0 && <p className={css.empty}>{t('page.empty')}</p>}
-      <Modal
-        open={addOpen}
-        onClose={() => { setAddOpen(false) }}
-        closeLabel={t('page.add.cancel')}
-        title={t('page.add.title')}
-        footer={(
-          <>
-            <Button variant="outline" onClick={() => { setAddOpen(false) }}>{t('page.add.cancel')}</Button>
-            <Button variant="primary" disabled={addBlocked} onClick={confirmAdd}>{t('page.add.confirm')}</Button>
-          </>
-        )}
-      >
-        <div className={css.addForm}>
-          <label className={css.addField}>
-            <span className={css.addFieldLabel}>{t('page.add.name')}</span>
-            <input
-              className={css.addFieldInput}
-              value={addDraft.name}
-              autoFocus
-              onChange={(event) => { setAddDraft(state => ({ ...state, name: event.target.value })) }}
-            />
-          </label>
-          <label className={css.addField}>
-            <span className={css.addFieldLabel}>{t('page.add.oneLiner')}</span>
-            <input
-              className={css.addFieldInput}
-              value={addDraft.oneLiner}
-              placeholder={t('page.add.oneLiner.hint')}
-              onChange={(event) => { setAddDraft(state => ({ ...state, oneLiner: event.target.value })) }}
-            />
-          </label>
-          <label className={css.addField}>
-            <span className={css.addFieldLabel}>{t('page.add.persona')}</span>
-            <textarea
-              className={css.addFieldArea}
-              rows={5}
-              value={addDraft.persona}
-              placeholder={t('page.add.persona.hint')}
-              onChange={(event) => { setAddDraft(state => ({ ...state, persona: event.target.value })) }}
-            />
-          </label>
+              <IconPlusOutline16 />
+              {t('page.add')}
+            </button>
+          )}
         </div>
-      </Modal>
-    </article>
+        {reorderEntries !== undefined && draggable && rows.length > 1 && (
+          <p className={css.orderHint}>{t('page.order.hint')}</p>
+        )}
+        <ul className={css.list}>
+          {rows.map((row) => {
+            const badge = row.local
+              ? t('page.local.badge')
+              : (showsConnections && row.capability !== undefined
+                ? bridgeBadge(row.capability, bridges, t) ?? t('page.status')
+                : t('page.status'))
+            return (
+              <li
+                key={row.id}
+                className={`${css.card} ${dragId === row.id ? css.cardDragging : ''}`}
+                draggable={draggable}
+                onDragStart={() => { setDragId(row.id) }}
+                onDragOver={(event) => { if (dragId !== null) event.preventDefault() }}
+                onDrop={() => { dropOn(row.id) }}
+                onDragEnd={() => { setDragId(null) }}
+              >
+                <div className={css.cardHead}>
+                  <h2 className={css.cardName}>{row.name}</h2>
+                  <span className={css.badge}>{badge}</span>
+                  {row.local && canEdit && (
+                    <button
+                      type="button"
+                      className={css.cardEdit}
+                      aria-label={t('page.edit.aria', { name: row.name })}
+                      onClick={() => { openEdit(row.id) }}
+                    >
+                      {t('page.edit')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className={css.cardOpen}
+                    aria-label={t('page.open', { name: row.name })}
+                    onClick={() => { focusCapability?.(row.id) }}
+                  >
+                    {t('page.open.label')}
+                  </button>
+                </div>
+                <p className={css.cardLead}>{row.hint}</p>
+                {row.capability !== undefined && (
+                  <dl className={css.fields}>
+                    {(row.capability.card ?? row.capability.fields).map(field => (
+                      <div key={field.termKey} className={css.field}>
+                        <dt className={css.term}>{t(field.termKey)}</dt>
+                        <dd className={css.value}>{t(field.valueKey)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+        {rows.length === 0 && <p className={css.empty}>{t('page.empty')}</p>}
+        <Modal
+          open={addOpen}
+          onClose={() => { setAddOpen(false) }}
+          closeLabel={t('page.add.cancel')}
+          title={t('page.add.title')}
+          footer={(
+            <>
+              <Button variant="outline" onClick={() => { setAddOpen(false) }}>{t('page.add.cancel')}</Button>
+              <Button variant="primary" disabled={addBlocked} onClick={confirmAdd}>{t('page.add.confirm')}</Button>
+            </>
+          )}
+        >
+          <div className={css.addForm}>
+            <label className={css.addField}>
+              <span className={css.addFieldLabel}>{t('page.add.name')}</span>
+              <input
+                className={css.addFieldInput}
+                value={addDraft.name}
+                autoFocus
+                onChange={(event) => { setAddDraft(state => ({ ...state, name: event.target.value })) }}
+              />
+            </label>
+            <label className={css.addField}>
+              <span className={css.addFieldLabel}>{t('page.add.oneLiner')}</span>
+              <input
+                className={css.addFieldInput}
+                value={addDraft.oneLiner}
+                placeholder={t('page.add.oneLiner.hint')}
+                onChange={(event) => { setAddDraft(state => ({ ...state, oneLiner: event.target.value })) }}
+              />
+            </label>
+            <label className={css.addField}>
+              <span className={css.addFieldLabel}>{t('page.add.persona')}</span>
+              <textarea
+                className={css.addFieldArea}
+                rows={5}
+                value={addDraft.persona}
+                placeholder={t('page.add.persona.hint')}
+                onChange={(event) => { setAddDraft(state => ({ ...state, persona: event.target.value })) }}
+              />
+            </label>
+          </div>
+        </Modal>
+      </article>
+      {editModal}
+    </>
   )
 }

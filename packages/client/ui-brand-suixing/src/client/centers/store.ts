@@ -56,6 +56,12 @@ export interface CentersService extends ObservableSnapshot<CentersSnapshot> {
    */
   addAgent(draft: AgentDraft): AgentSpec
   /**
+   * Rewrite one locally built agent from its edit form; the id stays.
+   * @param id - the agent's local id.
+   * @param draft - the edited spec.
+   */
+  updateAgent(id: string, draft: AgentDraft): void
+  /**
    * Forget one locally built agent.
    * @param id - the agent's local id.
    */
@@ -112,6 +118,11 @@ export function createCentersService(): CentersService {
       }
       store.update((state) => { state.agents = [...state.agents, agent] })
       return agent
+    },
+    updateAgent: (id, draft) => {
+      store.update((state) => {
+        state.agents = state.agents.map(agent => agent.id === id ? { id, ...draft } : agent)
+      })
     },
     removeAgent: (id) => {
       store.update((state) => { state.agents = state.agents.filter(agent => agent.id !== id) })

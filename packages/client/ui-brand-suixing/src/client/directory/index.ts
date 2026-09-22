@@ -38,7 +38,7 @@ import type { AgentDraft } from '../centers/spec.ts'
 import type { CentersService, CentersSnapshot } from '../centers/store.ts'
 import { registerSuiXingReferences } from '../references/index.ts'
 import { createRolePresets } from '../presets/index.ts'
-import { CapabilityFooter, CapabilityHero, owningCapability } from '../threads/hero.tsx'
+import { CapabilityFooter, CapabilityHero, owningAgent, owningCapability } from '../threads/hero.tsx'
 import { createThreadDialogs, ThreadDialogModals } from '../threads/dialogs.tsx'
 import { createThreadLauncher } from '../threads/launcher.ts'
 import { threadRows, type ThreadSummary } from '../threads/spec.ts'
@@ -187,12 +187,14 @@ export function registerSuiXingDirectory(
   )
   // A blank conversation's hero carries its capability's onboarding card, and
   // its composer signs where the chat is kept; unclaimed conversations leave
-  // both exactly as the base built them.
+  // both exactly as the base built them. The centres ride along as a bound
+  // hook, because a conversation a locally built agent owns reads its card —
+  // its one-liner, opening line, and starters — straight from that snapshot.
   ctx.effect(
     () => ctx.slots.inject('conversation.hero.capability', () => ctx.slots.register({
       name: 'conversation.hero.capability',
       locale: DIRECTORY_NS,
-      inject: () => ({ threads }),
+      inject: () => ({ threads, hooks: { centers } }),
     }, CapabilityHero)),
     'ui-brand-suixing: capability hero',
   )
@@ -200,7 +202,7 @@ export function registerSuiXingDirectory(
     () => ctx.slots.inject('conversation.hero.footer', () => ctx.slots.register({
       name: 'conversation.hero.footer',
       locale: DIRECTORY_NS,
-      inject: () => ({ threads }),
+      inject: () => ({ threads, hooks: { centers } }),
     }, CapabilityFooter)),
     'ui-brand-suixing: capability composer footnote',
   )
@@ -216,10 +218,17 @@ export function registerSuiXingDirectory(
     },
     placeholderFor: (sessionId: string | undefined) => {
       const spec = owningCapability(threads, sessionId)
-      if (spec === undefined) return undefined
-      // The capability's own example first; otherwise its first starter.
-      return spec.exampleKey !== undefined ? t(spec.exampleKey)
-        : (spec.starters?.[0] !== undefined ? t(spec.starters[0]) : undefined)
+      if (spec !== undefined) {
+        // The capability's own example first; otherwise its first starter.
+        return spec.exampleKey !== undefined ? t(spec.exampleKey)
+          : (spec.starters?.[0] !== undefined ? t(spec.starters[0]) : undefined)
+      }
+      // A local agent's conversation opens on its first starter, or on the
+      // opening line the edit form keeps — whatever the centre last saved.
+      const agent = owningAgent(threads, centers.getSnapshot(), sessionId)
+      if (agent === undefined) return undefined
+      return agent.starters[0]
+        ?? (agent.openingStatement === '' ? undefined : agent.openingStatement)
     },
   })
   // One navigation, two writers: the sidebar entry and the card both say "show
@@ -262,8 +271,11 @@ export function registerSuiXingDirectory(
         startCapability: (id: string) => { startCapability(id) },
         // The page's own add form stores through the same service Settings
         // uses, and its drags persist through the same catalog the sidebar
-        // renders from: one fact, three surfaces, no sync.
+        // renders from: one fact, three surfaces, no sync. The edit form
+        // writes through the same service, which is what carries an edit from
+        // the centre to the sidebar and to the conversation page.
         addAgent: (draft: AgentDraft) => { centers.addAgent(draft) },
+        updateAgent: (id: string, draft: AgentDraft) => { centers.updateAgent(id, draft) },
         reorderEntries: (entryIds: readonly string[]) => {
           ctx.sidebarCatalog.reorderEntries(group.id, entryIds)
         },

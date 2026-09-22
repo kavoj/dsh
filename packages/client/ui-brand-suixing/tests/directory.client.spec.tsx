@@ -246,6 +246,9 @@ describe('SuiXing capability directory — published data', () => {
       'detail.local.starters', 'detail.local.steps', 'detail.local.assumptions',
       'detail.start.agent', 'detail.start.creation', 'detail.start.workflow',
       'detail.start.project', 'detail.start.hint',
+      'page.edit', 'page.edit.aria', 'page.edit.title', 'page.edit.hint',
+      'page.edit.opening', 'page.edit.opening.hint', 'page.edit.starters',
+      'page.edit.starters.hint', 'page.edit.confirm', 'page.edit.cancel',
     ]) filled(key)
   })
 
@@ -473,6 +476,66 @@ describe('SuiXing capability directory — one capability in full', () => {
     // whether that becomes a real conversation or just a panel switch.
     expect(startCapability).toHaveBeenCalledTimes(1)
     expect(startCapability).toHaveBeenCalledWith('legal')
+  })
+
+  it('edits a locally built agent from its card and saves through the injected update', () => {
+    const updateAgent = vi.fn()
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useCenters={centersHook(snapshot)}
+        updateAgent={updateAgent} />,
+    )
+    // Shipped cards carry no edit door; the local one does.
+    expect(screen.queryByRole('button', { name: '编辑 总裁决策官 的配置与提示词' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '编辑 面料合规顾问 的配置与提示词' }))
+    expect(screen.getByText('编辑智能体')).toBeTruthy()
+    // The form opens pre-filled with what the agent carries today.
+    expect(screen.getByDisplayValue(LOCAL_AGENT.rolePrompt)).toBeTruthy()
+    expect(screen.getByDisplayValue(LOCAL_AGENT.openingStatement)).toBeTruthy()
+    expect(screen.getByDisplayValue('这个成分可以标全棉吗？')).toBeTruthy()
+
+    fireEvent.change(screen.getByDisplayValue('面料合规顾问'), {
+      target: { value: '面料合规顾问·新版' },
+    })
+    fireEvent.change(screen.getByDisplayValue(LOCAL_AGENT.rolePrompt), {
+      target: { value: '只回答成分与标识，其余一律转介。' },
+    })
+    fireEvent.click(screen.getByText('保存'))
+    expect(updateAgent).toHaveBeenCalledTimes(1)
+    const [id, draft] = updateAgent.mock.calls[0] as [string, Record<string, unknown>]
+    expect(id).toBe(LOCAL_AGENT.id)
+    expect(draft).toMatchObject({
+      name: '面料合规顾问·新版',
+      rolePrompt: '只回答成分与标识，其余一律转介。',
+      openingStatement: LOCAL_AGENT.openingStatement,
+      starters: ['这个成分可以标全棉吗？'],
+    })
+  })
+
+  it('keeps the edit door out of menus that hold no local agents', () => {
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(<DirectoryPage group={AUTOMATION} t={zhT} useCenters={centersHook(snapshot)} />)
+    expect(screen.queryByText('编辑智能体')).toBeNull()
+    expect(screen.queryByRole('button', { name: /编辑 .* 的配置与提示词/ })).toBeNull()
+  })
+
+  it('opens the same edit form from an agent detail page, over the detail view', () => {
+    const snapshot: CentersSnapshot = {
+      source: 'local', remoteBaseUrl: '', agents: [LOCAL_AGENT], workflows: [],
+    }
+    render(
+      <DirectoryPage group={AGENTS} t={zhT} useFocus={focusHook(LOCAL_AGENT.id)}
+        useCenters={centersHook(snapshot)} updateAgent={vi.fn()} />,
+    )
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('面料合规顾问')
+    fireEvent.click(screen.getByText('编辑'))
+    // The modal mounts even though the detail page replaced the list.
+    expect(screen.getByText('编辑智能体')).toBeTruthy()
+    expect(screen.getByDisplayValue(LOCAL_AGENT.rolePrompt)).toBeTruthy()
   })
 
   it('shows what the architect built: prompt, opening line, starters, assumptions', () => {

@@ -58,6 +58,8 @@ export interface CapabilityDetailProps extends PropsLocale<typeof DIRECTORY_NS> 
   readonly onBack: () => void
   /** Start work in the conversation the capability runs in today. */
   readonly onStart: () => void
+  /** Open the edit form for a locally built agent; absent shows no edit door. */
+  readonly onEdit?: (() => void) | undefined
 }
 
 /** The start control's wording per menu, so each centre keeps its own verb. */
@@ -170,7 +172,7 @@ function FieldBlock({ field, t }: { field: CapabilityField; t: CapabilityDetailP
  * @returns the detail page.
  */
 export function CapabilityDetail({
-  group, target, connection, onBack, onStart, t,
+  group, target, connection, onBack, onStart, onEdit, t,
 }: CapabilityDetailProps) {
   const name = target.kind === 'shipped'
     ? t(target.capability.labelKey)
@@ -276,6 +278,9 @@ export function CapabilityDetail({
       )}
 
       <div className={css.actions}>
+        {onEdit !== undefined && (
+          <Button variant="outline" onClick={onEdit}>{t('page.edit')}</Button>
+        )}
         <Button variant="primary" onClick={onStart}>{t(startKey)}</Button>
         <span className={css.actionHint}>{t('detail.start.hint')}</span>
       </div>

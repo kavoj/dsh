@@ -205,6 +205,22 @@ describe('SuiXing business centres — the store', () => {
     expect(centers.getSnapshot().source).toBe('remote')
     expect(centers.getSnapshot().remoteBaseUrl).toBe('https://agent.35sz.top')
   })
+
+  it('rewrites one agent in place from the edit form, keeping its id and place', () => {
+    const centers = createCentersService()
+    const first = centers.addAgent(draftAgentSpec('帮我审一遍合同'))
+    const second = centers.addAgent(draftAgentSpec('第二件事'))
+    centers.updateAgent(second.id, {
+      ...second, name: '改名后', rolePrompt: '新的提示词', starters: ['一条引导'],
+    })
+    const [keptFirst, keptSecond] = centers.getSnapshot().agents
+    expect(keptFirst?.id).toBe(first.id)
+    expect(keptSecond).toMatchObject({ id: second.id, name: '改名后', rolePrompt: '新的提示词' })
+    expect(keptSecond?.starters).toEqual(['一条引导'])
+    // An id nothing holds changes nothing, and never mints an entry.
+    centers.updateAgent('local.agent.9', { ...second, name: '幽灵' })
+    expect(centers.getSnapshot().agents).toHaveLength(2)
+  })
 })
 
 describe('SuiXing business centres — the settings page', () => {

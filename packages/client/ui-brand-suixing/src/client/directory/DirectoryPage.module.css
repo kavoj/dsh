@@ -178,6 +178,31 @@
   outline-offset: 1px;
 }
 
+/* The card's edit door, for the agents this machine built. Same pill as the
+   detail door, one step quieter: the edit form is a second action, not the
+   way in. */
+.cardEdit {
+  flex: 0 0 auto;
+  padding: 2px 10px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.cardEdit:hover {
+  color: var(--dsw-alias-brand-primary);
+  border-color: var(--dsw-alias-border-l3);
+}
+
+.cardEdit:focus-visible {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 1px;
+}
+
 .cardLead {
   margin: 0;
   font-size: 14px;
@@ -314,4 +339,13 @@ li[draggable="true"] {
 .addFieldArea:focus-visible {
   outline: none;
   border-color: var(--dsw-alias-border-brand);
+}
+
+/* The edit form's promise: what saving here changes elsewhere. One quiet
+   line above the fields, so the sync is stated, not discovered. */
+.editHint {
+  margin: 0 0 4px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
 }

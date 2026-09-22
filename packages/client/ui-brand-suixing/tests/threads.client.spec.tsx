@@ -16,10 +16,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createThreadLauncher, threadServices } from '../src/client/threads/launcher.ts'
+import { owningAgent } from '../src/client/threads/hero.tsx'
 import { THREAD_VISIBLE_LIMIT, liveThreads, threadRows } from '../src/client/threads/spec.ts'
 import {
   THREADS_PERSIST_NAME, createThreadsService, type ThreadsService,
 } from '../src/client/threads/store.ts'
+import { createCentersService } from '../src/client/centers/store.ts'
+import { draftAgentSpec } from '../src/client/centers/spec.ts'
 import { presetFor } from '../src/client/presets/spec.ts'
 import { AGENT_IDS } from '../src/client/directory/specs.ts'
 import { createRolePresets, type RolePresets } from '../src/client/presets/index.ts'
@@ -108,6 +111,23 @@ describe('capability conversations — the rows', () => {
   it('keeps only the bindings whose Session is still listed', () => {
     const kept = liveThreads([record('chief', 's1'), record('chief', 's2')], new Set(['s2']))
     expect(kept.map(item => item.sessionId)).toEqual(['s2'])
+  })
+})
+
+describe('capability conversations — the local agent on the hero', () => {
+  it('resolves the owning agent from the centres snapshot, and nothing for strangers', () => {
+    const threads = createThreadsService()
+    const centers = createCentersService()
+    const agent = centers.addAgent(draftAgentSpec('帮我审一遍合同'))
+    threads.bind(agent.id, 's1')
+    expect(owningAgent(threads, centers.getSnapshot(), 's1')?.id).toBe(agent.id)
+    // An unbound session, an unknown binding, and a binding whose agent is
+    // gone each resolve to nothing rather than to the wrong card.
+    expect(owningAgent(threads, centers.getSnapshot(), 's2')).toBeUndefined()
+    threads.bind('local.agent.99', 's3')
+    expect(owningAgent(threads, centers.getSnapshot(), 's3')).toBeUndefined()
+    expect(owningAgent(threads, { source: 'local', remoteBaseUrl: '', agents: [], workflows: [] }, 's1'))
+      .toBeUndefined()
   })
 })
 
