@@ -350,3 +350,110 @@
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
 }
+
+/* The platform invoke panel (v1 open API): one describe-submit-watch loop. */
+
+.invoke {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.invokeNote {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.invokePrompt {
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.invokePrompt:focus-visible {
+  outline: none;
+  border-color: var(--dsw-alias-border-brand);
+}
+
+.invokeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.invokeField {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.invokeField select {
+  padding: 4px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.invokeStatus {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.invokeError {
+  margin: 0;
+  color: var(--dsw-alias-label-critical, #d5304d);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.invokeResult {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invokeImages {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.invokeImages img {
+  width: 160px;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+.invokeVideo {
+  width: 100%;
+  max-width: 480px;
+  border-radius: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+}
+
+.invokeCost {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}

@@ -328,6 +328,7 @@ describe('SuiXing capability directory — the page', () => {
   it('says which 创作中心 capability the platform runs, and which one is pending', () => {
     const hooked: BridgeConfig = {
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { image: 'platform' },
       endpoints: {},
     }
@@ -337,7 +338,7 @@ describe('SuiXing capability directory — the page', () => {
 
     // Pointed at the platform without an origin: the page says so rather than
     // presenting an address that would not resolve.
-    const pending: BridgeConfig = { baseUrl: '', modes: { video: 'platform' }, endpoints: {} }
+    const pending: BridgeConfig = { baseUrl: '', apiKey: '', modes: { video: 'platform' }, endpoints: {} }
     cleanup()
     render(<DirectoryPage group={CREATION} t={zhT} useBridges={configHook(pending)} />)
     expect(screen.getByText('接口待配置')).toBeTruthy()
@@ -434,6 +435,7 @@ describe('SuiXing capability directory — one capability in full', () => {
   it('says where a creation capability runs, and what starts it', () => {
     const hooked: BridgeConfig = {
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { image: 'platform' },
       endpoints: {},
     }
@@ -444,7 +446,7 @@ describe('SuiXing capability directory — one capability in full', () => {
     expect(screen.getByText('能力接入点')).toBeTruthy()
     expect(screen.getByText('平台接口')).toBeTruthy()
     expect(screen.getByText('POST')).toBeTruthy()
-    expect(screen.getByText('https://agent.35sz.top/create-image')).toBeTruthy()
+    expect(screen.getByText('https://agent.35sz.top/openapi/v1/generations/image')).toBeTruthy()
     expect(screen.getByText(/由「设置 → 随星能力接入」配置/)).toBeTruthy()
 
     // Nothing configured: the address is the socket's reserved default path, and
@@ -452,7 +454,7 @@ describe('SuiXing capability directory — one capability in full', () => {
     cleanup()
     render(<DirectoryPage group={CREATION} t={zhT} useFocus={focusHook('music')} />)
     expect(screen.getByText('本机完成')).toBeTruthy()
-    expect(screen.getByText('/create-music')).toBeTruthy()
+    expect(screen.getByText('/openapi/v1/generations/mv')).toBeTruthy()
     expect(screen.getByText(/预留，未启用/)).toBeTruthy()
   })
 

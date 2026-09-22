@@ -43,7 +43,7 @@ const NO_CENTERS: CentersSnapshot = {
 const noCenters: SnapshotSelectorHook<CentersSnapshot> = select => select(NO_CENTERS)
 
 /** The connection configuration a page renders when none was injected. */
-const NO_BRIDGES: BridgeConfig = { baseUrl: '', modes: {}, endpoints: {} }
+const NO_BRIDGES: BridgeConfig = { baseUrl: '', apiKey: '', modes: {}, endpoints: {} }
 
 /** Selector hook over nothing: the stable fallback for `useBridges`. */
 const noBridges: SnapshotSelectorHook<BridgesSnapshot> = select => select(NO_BRIDGES)
@@ -143,7 +143,7 @@ export function DirectoryPage({
     if (detail === null || detail.kind !== 'shipped' || !showsConnections) return undefined
     const spec = bridge(detail.capability.id)
     if (spec === undefined) return undefined
-    return { spec, status: bridgeStatus(bridges, spec), url: bridgeUrl(bridges, spec) }
+    return { spec, status: bridgeStatus(bridges, spec), url: bridgeUrl(bridges, spec), apiKey: bridges.apiKey }
   }, [detail, showsConnections, bridges])
 
   if (detail !== null) {

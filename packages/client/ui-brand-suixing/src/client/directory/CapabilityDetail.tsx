@@ -20,6 +20,7 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ReactNode } from 'react'
 import type { BridgeSpec, BridgeStatus } from '../bridges/spec.ts'
 import type { AgentSpec, WorkflowSpec } from '../centers/spec.ts'
+import { PlatformInvoke } from './PlatformInvoke.tsx'
 import { DIRECTORY_NS, type SuiXingDirectoryKey } from './locales.ts'
 import {
   AGENTS_PANEL, AUTOMATION_PANEL, CREATION_PANEL, PROJECTS_PANEL,
@@ -41,6 +42,8 @@ export interface DetailConnection {
   readonly status: BridgeStatus
   /** The address the socket resolves to; empty while nothing is configured. */
   readonly url: string
+  /** The Bearer credential for the platform call; empty until the user fills it. */
+  readonly apiKey: string
 }
 
 /** Composed props: the locale seat, the subject, and the two navigations. */
@@ -266,6 +269,9 @@ export function CapabilityDetail({
             {' · '}
             {connection.status === 'local' ? t('page.bridge.reserved') : t('page.bridge.configured')}
           </p>
+          {connection.status === 'ready' && (
+            <PlatformInvoke socketId={connection.spec.id} url={connection.url} apiKey={connection.apiKey} t={t} />
+          )}
         </Section>
       )}
 

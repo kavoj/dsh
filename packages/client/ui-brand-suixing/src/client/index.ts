@@ -143,6 +143,7 @@ export function apply(ctx: ClientContext): void {
   const injectedBridges = (): BridgesSectionInjected => ({
     hooks: { bridges },
     setBaseUrl: (url) => { bridges.setBaseUrl(url) },
+    setApiKey: (key) => { bridges.setApiKey(key) },
     setMode: (id, mode) => { bridges.setMode(id, mode) },
     setEndpoint: (id, endpoint) => { bridges.setEndpoint(id, endpoint) },
     setAllModes: (mode) => { bridges.setAllModes(mode) },

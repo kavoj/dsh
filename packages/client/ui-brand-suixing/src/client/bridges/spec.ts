@@ -14,10 +14,13 @@
  * overrides live in the user's own configuration (see `store.ts`), so a
  * divergent endpoint never forces a code change here.
  *
- * Paths marked (assumed) come from the one example 老谢 gave —
- * `https://agent.35sz.top/create-image` — extended across the same family.
- * They are placeholders until the platform's open API list confirms them, and
- * the settings page lets the user overwrite any of them today.
+ * Paths marked with a v1 endpoint come from the platform's open API doc
+ * (`三五数字智能体平台-开放接口文档对外-v1.md`, base
+ * `https://agent.35sz.top`, all calls under `/openapi/v1`): image, video, and
+ * MV generation are real async-task endpoints, and the agents list is a real
+ * read. PPT and workflows have no published v1 endpoint yet — their defaults
+ * are reserved paths that answer 404 until the platform ships them, and the
+ * settings page lets the user overwrite any of them today.
  */
 
 import type { SuiXingBridgesKey } from './locales.ts'
@@ -47,21 +50,34 @@ export const DEFAULT_PLATFORM_BASE = 'https://agent.35sz.top'
 
 /** Every socket this distribution knows, in menu order. */
 export const BRIDGES: readonly BridgeSpec[] = [
-  // 创作中心 — one call per creation capability.
-  { id: 'ppt', centre: 'creation', labelKey: 'bridge.ppt', path: '/create-ppt', method: 'POST' },
-  { id: 'image', centre: 'creation', labelKey: 'bridge.image', path: '/create-image', method: 'POST' },
-  { id: 'video', centre: 'creation', labelKey: 'bridge.video', path: '/create-video', method: 'POST' },
-  { id: 'music', centre: 'creation', labelKey: 'bridge.music', path: '/create-music', method: 'POST' },
+  // 创作中心 — one call per creation capability. Image and video are the
+  // platform's real async-generation endpoints (submit → poll the task);
+  // music is carried by the MV endpoint, and PPT has no v1 endpoint yet.
+  { id: 'ppt', centre: 'creation', labelKey: 'bridge.ppt', path: '/openapi/v1/creator/ppt', method: 'POST' },
+  { id: 'image', centre: 'creation', labelKey: 'bridge.image', path: '/openapi/v1/generations/image', method: 'POST' },
+  { id: 'video', centre: 'creation', labelKey: 'bridge.video', path: '/openapi/v1/generations/video', method: 'POST' },
+  { id: 'music', centre: 'creation', labelKey: 'bridge.music', path: '/openapi/v1/generations/mv', method: 'POST' },
   // The two centres' capability lists; read-only calls whose response shape is
   // the spec this distribution already renders (see the A2A design note).
-  { id: 'agents', centre: 'agents', labelKey: 'bridge.agents', path: '/agents', method: 'GET' },
-  { id: 'workflows', centre: 'automation', labelKey: 'bridge.workflows', path: '/workflows', method: 'GET' },
+  // The agents list is a real v1 endpoint; workflows have none published yet.
+  { id: 'agents', centre: 'agents', labelKey: 'bridge.agents', path: '/openapi/v1/agents', method: 'GET' },
+  { id: 'workflows', centre: 'automation', labelKey: 'bridge.workflows', path: '/openapi/v1/workflows', method: 'GET' },
 ]
+
+/**
+ * The sockets whose v1 platform call is the async-generation task pattern:
+ * submit returns a `taskId`, and the result arrives by polling
+ * `/openapi/v1/tasks/{taskId}`. Sockets outside this set either are plain
+ * reads (agents) or have no published endpoint yet (ppt, workflows).
+ */
+export const TASK_SOCKETS: ReadonlySet<string> = new Set(['image', 'video', 'music'])
 
 /** What the user configured for the sockets. */
 export interface BridgeConfig {
   /** Platform origin; empty means every socket stays local. */
   readonly baseUrl: string
+  /** Bearer credential the platform authenticates; empty until the user fills it. */
+  readonly apiKey: string
   /** Per-socket choice; a socket absent here runs locally. */
   readonly modes: Readonly<Record<string, BridgeMode>>
   /** Per-socket endpoint override: a path or a full URL; empty means default. */
@@ -78,7 +94,7 @@ export type BridgeStatus =
   | 'pending'
 
 /** The configuration a fresh install starts from: everything local. */
-export const EMPTY_BRIDGE_CONFIG: BridgeConfig = { baseUrl: '', modes: {}, endpoints: {} }
+export const EMPTY_BRIDGE_CONFIG: BridgeConfig = { baseUrl: '', apiKey: '', modes: {}, endpoints: {} }
 
 /**
  * Find one socket by its capability id.

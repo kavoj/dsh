@@ -30,6 +30,8 @@ export interface BridgesSectionInjected {
   }
   /** Record the platform origin. */
   setBaseUrl: (url: string) => void
+  /** Record the platform API key (the Bearer credential). */
+  setApiKey: (key: string) => void
   /** Choose what drives one capability. */
   setMode: (id: string, mode: BridgeMode) => void
   /** Record one capability's endpoint override. */
@@ -110,7 +112,7 @@ function BridgeRow({
  * @returns the section content.
  */
 export function BridgesSection({
-  useBridges, setBaseUrl, setMode, setEndpoint, setAllModes, t,
+  useBridges, setBaseUrl, setApiKey, setMode, setEndpoint, setAllModes, t,
 }: BridgesSectionProps) {
   const config = useBridges(state => state)
   const connected = platformCount(config)
@@ -129,6 +131,17 @@ export function BridgesSection({
             value={config.baseUrl}
             placeholder={DEFAULT_PLATFORM_BASE}
             onChange={(event) => { setBaseUrl(event.target.value) }}
+          />
+        </label>
+        <label className={css.field}>
+          <span className={css.label}>{t('key.label')}</span>
+          <input
+            className={css.input}
+            type="password"
+            autoComplete="off"
+            value={config.apiKey}
+            placeholder="sk-..."
+            onChange={(event) => { setApiKey(event.target.value) }}
           />
         </label>
         <p className={css.hint}>{t('base.hint')}</p>

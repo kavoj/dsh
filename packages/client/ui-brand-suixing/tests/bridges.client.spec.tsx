@@ -59,6 +59,7 @@ function mountSection(service: BridgesService, t: BridgesSectionProps['t'] = zhT
     <BridgesSection
       useBridges={bridgesHook(service)}
       setBaseUrl={(url) => { service.setBaseUrl(url) }}
+      setApiKey={(key) => { service.setApiKey(key) }}
       setMode={(id, mode) => { service.setMode(id, mode) }}
       setEndpoint={(id, endpoint) => { service.setEndpoint(id, endpoint) }}
       setAllModes={(mode) => { service.setAllModes(mode) }}
@@ -90,7 +91,7 @@ describe('SuiXing capability connections — the table', () => {
     // The four creation capabilities are the ones the platform answers for.
     expect(BRIDGES.filter(spec => spec.centre === 'creation').map(spec => spec.id))
       .toEqual(['ppt', 'image', 'video', 'music'])
-    expect(bridge('image')?.path).toBe('/create-image')
+    expect(bridge('image')?.path).toBe('/openapi/v1/generations/image')
     expect(bridge('nope')).toBeUndefined()
     expect(DEFAULT_PLATFORM_BASE).toBe('https://agent.35sz.top')
   })
@@ -115,12 +116,13 @@ describe('SuiXing capability connections — resolving an address', () => {
 
   it('joins the origin with the socket default, tolerant of a trailing slash', () => {
     const config = { ...EMPTY_BRIDGE_CONFIG, baseUrl: 'https://agent.35sz.top/' }
-    expect(bridgeUrl(config, image)).toBe('https://agent.35sz.top/create-image')
+    expect(bridgeUrl(config, image)).toBe('https://agent.35sz.top/openapi/v1/generations/image')
   })
 
   it('lets one capability override its path, with or without the leading slash', () => {
     const config = {
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { image: 'platform' as const },
       endpoints: { image: 'v2/create-image' },
     }
@@ -131,6 +133,7 @@ describe('SuiXing capability connections — resolving an address', () => {
   it('lets one capability point at a different host entirely', () => {
     const config = {
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { music: 'platform' as const },
       endpoints: { music: 'https://audio.35sz.top/generate' },
     }
@@ -147,6 +150,7 @@ describe('SuiXing capability connections — resolving an address', () => {
   it('counts the sockets pointed at the platform', () => {
     const config = {
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { image: 'platform' as const, agents: 'platform' as const },
       endpoints: {},
     }
@@ -166,6 +170,7 @@ describe('SuiXing capability connections — the store', () => {
     bridges.setEndpoint('image', 'https://agent.35sz.top/create-image')
     expect(bridges.getSnapshot()).toMatchObject({
       baseUrl: 'https://agent.35sz.top',
+      apiKey: '',
       modes: { image: 'platform' },
       endpoints: { image: 'https://agent.35sz.top/create-image' },
     })
@@ -188,7 +193,7 @@ describe('SuiXing capability connections — the store', () => {
     bridges.setEndpoint('video', '/v2/video')
     expect(bridgeUrl(bridges.getSnapshot(), bridge('video')!)).toBe('https://agent.35sz.top/v2/video')
     bridges.setEndpoint('video', '')
-    expect(bridgeUrl(bridges.getSnapshot(), bridge('video')!)).toBe('https://agent.35sz.top/create-video')
+    expect(bridgeUrl(bridges.getSnapshot(), bridge('video')!)).toBe('https://agent.35sz.top/openapi/v1/generations/video')
   })
 
   it('notifies subscribers when a socket moves', () => {
@@ -246,7 +251,7 @@ describe('SuiXing capability connections — the settings page', () => {
     // table's default path — no extra step for the user.
     fireEvent.click(within(row(bridgesZh['bridge.ppt'])).getByText(bridgesZh['row.platform']))
     expect(bridges.getSnapshot().modes.ppt).toBe('platform')
-    expect(screen.getByText('接平台：https://agent.35sz.top/create-ppt')).toBeTruthy()
+    expect(screen.getByText('接平台：https://agent.35sz.top/openapi/v1/creator/ppt')).toBeTruthy()
 
     fireEvent.click(screen.getByText(bridgesZh['bulk.platform']))
     expect(screen.getByText('走平台 6 / 6 项')).toBeTruthy()

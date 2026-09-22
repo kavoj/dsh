@@ -20,6 +20,8 @@ import { BRIDGES, type BridgeConfig, type BridgeMode } from './spec.ts'
 interface BridgesState {
   /** Platform origin; empty means every socket stays local. */
   baseUrl: string
+  /** Bearer credential the platform authenticates; empty until the user fills it. */
+  apiKey: string
   /** Per-socket choice; a socket absent here runs locally. */
   modes: Record<string, BridgeMode>
   /** Per-socket endpoint override; empty means the table's default path. */
@@ -30,7 +32,7 @@ interface BridgesState {
 export type BridgesSnapshot = Readonly<BridgeConfig>
 
 /** Where every reader finds a fresh install: everything local, no origin. */
-const INITIAL_STATE: BridgesState = { baseUrl: '', modes: {}, endpoints: {} }
+const INITIAL_STATE: BridgesState = { baseUrl: '', apiKey: '', modes: {}, endpoints: {} }
 
 /** The connection configuration service. */
 export interface BridgesService extends ObservableSnapshot<BridgesSnapshot> {
@@ -39,6 +41,11 @@ export interface BridgesService extends ObservableSnapshot<BridgesSnapshot> {
    * @param url - the origin every un-overridden socket is resolved against.
    */
   setBaseUrl(url: string): void
+  /**
+   * Record the platform API key (sent as the Bearer credential).
+   * @param key - the key, or an empty string to clear it.
+   */
+  setApiKey(key: string): void
   /**
    * Choose what drives one capability.
    * @param id - the capability's id.
@@ -71,6 +78,7 @@ export function createBridgesService(): BridgesService {
     getSnapshot: () => store.getSnapshot(),
     subscribe: listener => store.subscribe(listener),
     setBaseUrl: (baseUrl) => { store.update((draft) => { draft.baseUrl = baseUrl }) },
+    setApiKey: (apiKey) => { store.update((draft) => { draft.apiKey = apiKey.trim() }) },
     setMode: (id, mode) => {
       store.update((draft) => { draft.modes = { ...draft.modes, [id]: mode } })
     },
