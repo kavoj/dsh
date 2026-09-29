@@ -18,7 +18,7 @@ import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useStat
 import clsx from 'clsx'
 import {
   Button, IconArchiveCheckOutlineRegular, IconArchiveOffOutlineRegular, IconArchiveOutlineRegular,
-  IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
+  IconChevronDownOutlineRegular, IconChevronsUpDownOutlineRegular, IconClockOutlineRegular, IconCloseFillRegular,
   IconFlatListOutlineRegular, IconFolderCloseRegular, IconProjectAddOutlineRegular,
   IconQueueOutlineRegular, IconSearchOutlineRegular, IconSlidersTwoOutlineRegular,
   IconWorkspaceTreeOutlineRegular, Menu, Modal, Toast, Tooltip,
@@ -1013,6 +1013,18 @@ export function WorkspaceBrowser({
   // does not silently drop an in-progress filter.
   const [query, setQuery] = useState('')
   const [searchExpanded, setSearchExpanded] = useState(false)
+  // Section-level fold: the label row stays, the list collapses away. Persisted
+  // so a person who keeps it closed does not reopen it on every load.
+  const [sectionCollapsed, setSectionCollapsed] = useState(() => {
+    try { return globalThis.localStorage?.getItem('dsh.workspace.sectionCollapsed') === '1' } catch { return false }
+  })
+  const toggleSection = (): void => {
+    setSectionCollapsed((current) => {
+      const next = !current
+      try { globalThis.localStorage?.setItem('dsh.workspace.sectionCollapsed', next ? '1' : '0') } catch { /* private mode */ }
+      return next
+    })
+  }
   const [revealSessionId, setRevealSessionId] = useState<SessionId | undefined>(undefined)
   const normalizedQuery = sanitizeSearchQuery(query).trim()
   const [remoteSearch, setRemoteSearch] = useState<RemoteSearchState>({
@@ -1205,8 +1217,21 @@ export function WorkspaceBrowser({
   }
 
   return (
-    <div className={clsx(css.root, !wide && css.rail)}>
+    <div className={clsx(css.root, !wide && css.rail, sectionCollapsed && css.sectionCollapsed)}>
       <div className={css.sectionHeader}>
+        {wide && (
+          <Tooltip label={sectionCollapsed ? '展开列表' : '收起列表'} side="bottom" delayMs={500}>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={sectionCollapsed ? '展开列表' : '收起列表'}
+              aria-expanded={!sectionCollapsed}
+              onClick={toggleSection}
+            >
+              <span style={{ display: 'inline-flex', transform: sectionCollapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 120ms' }}><IconChevronDownOutlineRegular /></span>
+            </button>
+          </Tooltip>
+        )}
         {wide && (
           <span className={clsx(css.sectionLabel, css.wide, searchExpanded && css.sectionLabelHidden)}>
             {groupBy === 'flat' ? t('section.sessions') : t('section.workspaces')}

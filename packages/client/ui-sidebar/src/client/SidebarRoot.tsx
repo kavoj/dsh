@@ -294,13 +294,24 @@ export function SidebarRoot({
         </nav>
       )}
 
-      {/* The browsing region fills the column between the controls and the
-          foot in both states; its rail icon column rides the same slot. */}
-      <div className={css.regionArea}>
-        {renderSlot('sidebar.workspaces', {
-          wide,
-          expandSidebar: () => { if (collapsed) toggleSidebar() },
-        })}
+      {/* The browsing region and the flow region share one scroll surface, so
+          growth in one pushes the other down and the column keeps one scrollbar. */}
+      <div className={css.stackArea}>
+        <div className={css.regionArea}>
+          {renderSlot('sidebar.workspaces', {
+            wide,
+            expandSidebar: () => { if (collapsed) toggleSidebar() },
+          })}
+        </div>
+
+        {/* Saved content pipelines sit at the same level as the workspace
+          browser, in their own shorter region above the foot. */}
+        <div className={css.flowArea}>
+          {renderSlot('sidebar.flows', {
+            wide,
+            expandSidebar: () => { if (collapsed) toggleSidebar() },
+          })}
+        </div>
       </div>
 
       {/* Footer actions stack above Settings in both sidebar widths. */}

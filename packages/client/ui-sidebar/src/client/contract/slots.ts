@@ -41,6 +41,13 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      */
     'sidebar.workspaces': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
     /**
+     * The saved-pipeline region at the same level as the workspace browser.
+     * Declared by this package's 'sidebar' entry; the marketing-flows plugin
+     * registers its list, search, view tabs and Add-flow row. The sidebar
+     * passes only its column state — the flows hold their own data.
+     */
+    'sidebar.flows': { kind: 'single'; scope: 'root'; owner: SidebarSectionOwnerProps }
+    /**
      * The settings seat at the sidebar foot. Declared by this package's
      * 'sidebar' entry; ui-settings registers its trigger row + modal panel.
      * The sidebar passes only its column state — it holds no settings state.
@@ -142,6 +149,7 @@ export type SidebarRootComponentProps =
     | 'sidebar.toggle.badge'
     | 'sidebar.panellist'
     | 'sidebar.workspaces'
+    | 'sidebar.flows'
     | 'sidebar.settings'
     | 'sidebar.footer.action'
   >

@@ -288,6 +288,16 @@
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
 
+    # Saved content pipelines: the sidebar Flows region and the workspace panel
+    # that turns a brief plus product images into channel-ready assets.
+    - id: ui-marketing-flows
+      name: '@deepseek-ai/dsh-client-ui-marketing-flows'
+
+    # Marketing channel catalog: the sidebar Channels page classifies promotion
+    # platforms by authorization availability. Static data; no Remote, no Host state.
+    - id: ui-marketing-channels
+      name: '@deepseek-ai/dsh-client-ui-marketing-channels'
+
     # Plugin management: the sidebar Plugins page installs, enables, disables,
     # and removes the profile's bundles through the `pluginManager` Remote.
     # Without a profile-backed Host it reports itself unavailable.

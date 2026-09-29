@@ -619,3 +619,8 @@
     transition: none;
   }
 }
+
+/* Section fold: the header row (label, search, view options, add) keeps its
+   controls, and only the list area collapses away. */
+.sectionCollapsed .listArea { display: none; }
+.sectionCollapsed .sectionHeader { margin-bottom: 0; }

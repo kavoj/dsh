@@ -612,3 +612,32 @@
     animation: none;
   }
 }
+
+/* The saved-pipeline region: a compact block that never eats the browsing
+   region's space, and disappears with the column when collapsed. */
+.flowArea {
+  /* Own stacking context above the browsing region: the workspace list keeps its
+     internal scroll, and this region still receives every pointer event and
+     paints its own background instead of showing the list through it. */
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  flex: none;
+  min-height: 0;
+  max-height: 46%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin-left: -4px;
+  margin-right: calc(-1 * var(--dsh-sidebar-inline-padding));
+  padding-left: 4px;
+}
+.collapsed .flowArea { display: none; }
+
+/* One scroll surface for the browsing region and the flow region: content in
+   either grows the column, and the single scrollbar covers both. */
+.stackArea {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
